@@ -1,0 +1,53 @@
+[
+  {
+    "id": "01-mensagem",
+    "category": "mensagem",
+    "text": "Oi, João. Eu consigo terminar essa tarefa amanhã no fim da tarde."
+  },
+  {
+    "id": "02-correcao",
+    "category": "autocorreção falada",
+    "text": "A reunião será na terça-feira, às três da tarde."
+  },
+  {
+    "id": "03-numeros",
+    "category": "números",
+    "text": "O orçamento ficou em dois mil quatrocentos e cinquenta reais."
+  },
+  {
+    "id": "04-email",
+    "category": "e-mail",
+    "text": "Bom dia, gostaria de confirmar o recebimento dos documentos enviados ontem."
+  },
+  {
+    "id": "05-lista",
+    "category": "lista",
+    "text": "Precisamos revisar o contrato, atualizar a proposta e marcar a apresentação."
+  },
+  {
+    "id": "06-tecnico",
+    "category": "termos técnicos",
+    "text": "O projeto usa Electron, TypeScript, Whisper e Ollama."
+  },
+  {
+    "id": "07-codigo",
+    "category": "programação",
+    "text": "Crie uma função assíncrona que valide o token antes de chamar a API."
+  },
+  {
+    "id": "08-data",
+    "category": "datas",
+    "text": "A entrega está prevista para vinte e três de junho de dois mil e vinte e seis."
+  },
+  {
+    "id": "09-pontuacao",
+    "category": "pontuação",
+    "text": "Se o cliente aprovar, seguimos com a implementação; caso contrário, revisamos o escopo."
+  },
+  {
+    "id": "10-natural",
+    "category": "fala natural",
+    "text": "Eu estava pensando em começar pela versão mais simples e melhorar aos poucos."
+  }
+]
+

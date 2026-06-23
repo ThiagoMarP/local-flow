@@ -1,0 +1,10 @@
+node_modules/
+native/whisper/
+models/
+benchmarks/samples/*.wav
+benchmarks/results/*.json
+benchmarks/results/*.md
+work/
+*.log
+*.tmp
+

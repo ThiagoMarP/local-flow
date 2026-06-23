@@ -1,0 +1,38 @@
+{
+  "capturedAt": "2026-06-23",
+  "operatingSystem": {
+    "platform": "win32",
+    "release": "10.0.26200"
+  },
+  "hardware": {
+    "cpu": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "logicalCores": 24,
+    "totalRamBytes": 33413771264,
+    "dedicatedNvidiaGpuDetected": false
+  },
+  "runtime": {
+    "node": "24.13.0",
+    "npm": "11.14.1",
+    "whisperCpp": "1.9.1",
+    "initialBackend": "CPU",
+    "benchmarkThreads": 12
+  },
+  "artifacts": [
+    {
+      "file": "whisper-cli.exe",
+      "sizeBytes": 479232,
+      "sha256": "58245314FB73B30FBD0CF0542C5C172E23F02B6EB7CAD7B51E792439CF5E1755"
+    },
+    {
+      "file": "ggml-small-q5_1.bin",
+      "sizeBytes": 190085487,
+      "sha256": "AE85E4A935D7A567BD102FE55AFC16BB595BDB618E11B2FC7591BC08120411BB"
+    },
+    {
+      "file": "ggml-medium-q5_0.bin",
+      "sizeBytes": 539212467,
+      "sha256": "19FEA4B380C3A618EC4723C3EEF2EB785FFBA0D0538CF43F8F235E7B3B34220F"
+    }
+  ]
+}
+
