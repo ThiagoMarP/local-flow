@@ -32,7 +32,11 @@
       "file": "ggml-medium-q5_0.bin",
       "sizeBytes": 539212467,
       "sha256": "19FEA4B380C3A618EC4723C3EEF2EB785FFBA0D0538CF43F8F235E7B3B34220F"
+    },
+    {
+      "file": "ggml-large-v3-turbo-q5_0.bin",
+      "sizeBytes": 574041195,
+      "sha256": "394221709CD5AD1F40C46E6031CA61BCE88931E6E088C188294C6D5A55FFA7E2"
     }
   ]
 }
-

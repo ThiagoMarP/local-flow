@@ -15,6 +15,7 @@ const resultsDir =
   process.env.BENCHMARK_RESULTS_DIR ||
   path.join(root, "benchmarks", "results");
 const threadCount = String(process.env.WHISPER_THREADS || 12);
+const initialPrompt = process.env.WHISPER_INITIAL_PROMPT?.trim() || "";
 const prompts = JSON.parse(
   await readFile(path.join(root, "benchmarks", "prompts.json"), "utf8"),
 );
@@ -73,6 +74,9 @@ function runWhisper(model, sample, outputBase) {
       "-of",
       outputBase,
     ];
+    if (initialPrompt) {
+      args.push("--prompt", initialPrompt, "--carry-initial-prompt");
+    }
     const startedAt = performance.now();
     const child = spawn(whisperPath, args, {
       cwd: root,
@@ -218,6 +222,7 @@ const report = {
   generatedAt: new Date().toISOString(),
   whisperPath,
   threadCount: Number(threadCount),
+  initialPrompt: initialPrompt || null,
   summaries,
   details,
 };
@@ -230,6 +235,7 @@ const markdown = [
   `# Benchmark Whisper — ${runId}`,
   "",
   `Threads: ${threadCount}`,
+  `Vocabulário inicial: ${initialPrompt || "nenhum"}`,
   "",
   "| Modelo | Amostras | WER médio | Tempo médio | Pior tempo | Fator de tempo real |",
   "|---|---:|---:|---:|---:|---:|",

@@ -14,22 +14,27 @@ $ReleaseUrl = "https://github.com/ggml-org/whisper.cpp/releases/download/$Releas
 
 New-Item -ItemType Directory -Force -Path $NativeDir, $ModelsDir, $TempDir | Out-Null
 
-$ZipPath = Join-Path $TempDir $ReleaseZip
-Write-Host "Baixando whisper.cpp $ReleaseVersion..."
-Invoke-WebRequest -Uri $ReleaseUrl -OutFile $ZipPath
+$InstalledCli = Join-Path $NativeDir "whisper-cli.exe"
+if (Test-Path $InstalledCli) {
+  Write-Host "whisper.cpp já está instalado."
+} else {
+  $ZipPath = Join-Path $TempDir $ReleaseZip
+  Write-Host "Baixando whisper.cpp $ReleaseVersion..."
+  Invoke-WebRequest -Uri $ReleaseUrl -OutFile $ZipPath
 
-$ExtractDir = Join-Path $TempDir "extracted"
-if (Test-Path $ExtractDir) {
-  Remove-Item -LiteralPath $ExtractDir -Recurse -Force
+  $ExtractDir = Join-Path $TempDir "extracted"
+  if (Test-Path $ExtractDir) {
+    Remove-Item -LiteralPath $ExtractDir -Recurse -Force
+  }
+  Expand-Archive -LiteralPath $ZipPath -DestinationPath $ExtractDir
+
+  $Cli = Get-ChildItem -Path $ExtractDir -Recurse -Filter "whisper-cli.exe" | Select-Object -First 1
+  if (-not $Cli) {
+    throw "whisper-cli.exe não foi encontrado no pacote."
+  }
+
+  Copy-Item -Path (Join-Path $Cli.DirectoryName "*") -Destination $NativeDir -Recurse -Force
 }
-Expand-Archive -LiteralPath $ZipPath -DestinationPath $ExtractDir
-
-$Cli = Get-ChildItem -Path $ExtractDir -Recurse -Filter "whisper-cli.exe" | Select-Object -First 1
-if (-not $Cli) {
-  throw "whisper-cli.exe não foi encontrado no pacote."
-}
-
-Copy-Item -Path (Join-Path $Cli.DirectoryName "*") -Destination $NativeDir -Recurse -Force
 
 $Models = @(
   @{

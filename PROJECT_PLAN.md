@@ -20,7 +20,7 @@ Criar um aplicativo Windows de ditado local, sem limite de palavras, com:
 | Fase | Estado | Entrega |
 |---|---|---|
 | 0. Arquitetura e ambiente | Concluída | Stack e restrições definidas |
-| 1. Benchmark do Whisper | Em andamento | Modelo e backend padrão escolhidos |
+| 1. Benchmark do Whisper | Concluída | Perfis Small, Medium e Large V3 Turbo definidos |
 | 2. Núcleo funcional | Pendente | Microfone → transcrição → clipboard |
 | 3. Aplicativo desktop | Pendente | Interface e cápsula flutuante |
 | 4. Integração com Windows | Pendente | Atalho e inserção automática |
@@ -93,6 +93,15 @@ Escolher o modelo e o backend com melhor equilíbrio entre qualidade em portugu�
 - `benchmarks/prompts.json`: frases e textos esperados.
 - `benchmarks/results/`: relatórios produzidos.
 
+### Decisão final
+
+- Perfil rápido: `small-q5_1`.
+- Perfil padrão: `medium-q5_0`.
+- Perfil de precisão: `large-v3-turbo-q5_0`.
+- Backend inicial: CPU com até 24 threads.
+- Vocabulário pessoal será enviado como prompt inicial ao Whisper.
+- Vulkan permanece como otimização futura, não como dependência do MVP.
+
 ## Fase 2 — Núcleo funcional
 
 Construir o pipeline:
@@ -135,4 +144,3 @@ Gerar instalador `.exe`, assistente de modelos, documentação, testes de instal
 - Transcrição de reuniões com diarização.
 - Uso da NPU.
 - macOS e Linux.
-
