@@ -45,3 +45,11 @@ O renderer captura e converte o microfone para WAV PCM de 16 kHz. O processo pri
 ## 2026-06-23 — Janela persistente e bandeja
 
 A partir da Fase 3, fechar o painel principal ocultará a janela em vez de encerrar o aplicativo. O encerramento explícito ficará disponível na bandeja do sistema.
+
+## 2026-06-23 — Cápsula somente visual
+
+A cápsula não recebe foco nem eventos do mouse. Sua função é representar o estado da gravação sem interromper o aplicativo em que o usuário está trabalhando. Interações e configurações permanecem no painel principal.
+
+## 2026-06-23 — Estado centralizado no processo principal
+
+O painel publica um contrato restrito de estado. O processo principal normaliza esse conteúdo e o encaminha para a cápsula. Isso permite que o atalho global da Fase 4 reutilize a mesma interface sem acoplamento direto entre janelas.

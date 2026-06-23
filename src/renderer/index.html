@@ -17,10 +17,10 @@
     <main class="shell">
       <header class="header">
         <div>
-          <p class="eyebrow">Fase 2 · núcleo local</p>
+          <p class="eyebrow">Fase 3 · aplicativo desktop</p>
           <h1>Local Flow</h1>
           <p class="subtitle">
-            Grave uma frase, transcreva com o Whisper local e copie o resultado.
+            Ditado local com painel persistente, cápsula flutuante e bandeja.
           </p>
         </div>
         <div class="privacy">
@@ -92,6 +92,29 @@
         ></textarea>
       </section>
 
+      <section class="panel tray-panel">
+        <div>
+          <p class="label">Aplicativo em segundo plano</p>
+          <p class="result-meta">
+            Fechar esta janela mantém o Local Flow disponível na bandeja.
+          </p>
+        </div>
+        <div class="demo-controls" aria-label="Prévia da cápsula">
+          <button class="demo-button" data-demo-state="recording">
+            Ouvindo
+          </button>
+          <button class="demo-button" data-demo-state="processing">
+            Processando
+          </button>
+          <button class="demo-button" data-demo-state="success">
+            Concluído
+          </button>
+          <button class="demo-button" data-demo-state="error">
+            Erro
+          </button>
+        </div>
+      </section>
+
       <p class="footnote">
         O arquivo de áudio é temporário e removido após a transcrição.
       </p>
@@ -100,4 +123,3 @@
     <script type="module" src="./renderer.js"></script>
   </body>
 </html>
-

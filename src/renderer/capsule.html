@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self';"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Local Flow Capsule</title>
+    <link rel="stylesheet" href="./capsule.css" />
+  </head>
+  <body>
+    <main class="capsule" id="capsule" data-state="idle">
+      <div class="status-icon">
+        <span class="mic-dot"></span>
+        <span class="success-mark">✓</span>
+        <span class="error-mark">!</span>
+        <span class="spinner"></span>
+      </div>
+
+      <div class="content">
+        <div class="top-line">
+          <strong id="message">Pronto</strong>
+          <span id="timer">00:00</span>
+        </div>
+        <div class="wave" id="wave" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+      </div>
+
+      <span class="profile" id="profile">Medium</span>
+    </main>
+    <script type="module" src="./capsule.js"></script>
+  </body>
+</html>
+

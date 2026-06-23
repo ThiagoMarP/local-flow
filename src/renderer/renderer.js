@@ -20,6 +20,31 @@ let chunks = [];
 let recordingStartedAt = 0;
 let timerInterval;
 let state = "booting";
+let lastLevelPublish = 0;
+
+function capsuleState(nextState) {
+  if (nextState === "requesting") return "processing";
+  if (
+    ["idle", "recording", "processing", "success", "error"].includes(
+      nextState,
+    )
+  ) {
+    return nextState;
+  }
+  return "idle";
+}
+
+function publishUiState(overrides = {}) {
+  window.localFlow.updateUiState({
+    state: capsuleState(state),
+    message: statusElement.textContent,
+    profile: profileSelect.value,
+    elapsedMs:
+      state === "recording" ? Date.now() - recordingStartedAt : 0,
+    level: 0,
+    ...overrides,
+  });
+}
 
 function setStatus(nextState, message) {
   state = nextState;
@@ -32,6 +57,7 @@ function setStatus(nextState, message) {
     state === "recording" || state === "processing";
   vocabularyInput.disabled =
     state === "recording" || state === "processing";
+  publishUiState();
 }
 
 function formatDuration(milliseconds) {
@@ -42,7 +68,9 @@ function formatDuration(milliseconds) {
 }
 
 function updateTimer() {
-  timerElement.textContent = formatDuration(Date.now() - recordingStartedAt);
+  const elapsedMs = Date.now() - recordingStartedAt;
+  timerElement.textContent = formatDuration(elapsedMs);
+  publishUiState({ elapsedMs });
 }
 
 function buildWav() {
@@ -77,7 +105,16 @@ async function startRecording() {
       for (const value of copy) {
         peak = Math.max(peak, Math.abs(value));
       }
+      const level = Math.min(1, peak * 3.2);
       meterFill.style.width = `${Math.min(100, 4 + peak * 250)}%`;
+      const now = Date.now();
+      if (now - lastLevelPublish > 80) {
+        lastLevelPublish = now;
+        publishUiState({
+          elapsedMs: now - recordingStartedAt,
+          level,
+        });
+      }
     };
 
     sourceNode.connect(processorNode);
@@ -152,6 +189,25 @@ copyButton.addEventListener("click", async () => {
   await window.localFlow.copyText(resultText.value);
   resultMeta.textContent = "Texto copiado novamente.";
 });
+profileSelect.addEventListener("change", () => publishUiState());
+
+for (const button of document.querySelectorAll("[data-demo-state]")) {
+  button.addEventListener("click", () => {
+    const demoState = button.dataset.demoState;
+    window.localFlow.updateUiState({
+      state: demoState,
+      message: {
+        recording: "Ouvindo…",
+        processing: "Transcrevendo…",
+        success: "Texto copiado",
+        error: "Não foi possível transcrever",
+      }[demoState],
+      profile: profileSelect.value,
+      elapsedMs: demoState === "recording" ? 8400 : 0,
+      level: demoState === "recording" ? 0.68 : 0,
+    });
+  });
+}
 
 window.addEventListener("beforeunload", () => {
   microphoneStream?.getTracks().forEach((track) => track.stop());

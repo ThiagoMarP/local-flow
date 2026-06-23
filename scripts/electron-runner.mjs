@@ -55,10 +55,16 @@ export async function runElectron({
       await rm(userDataPath, { recursive: true, force: true }).catch(
         () => {},
       );
-      if (code !== 0 || !output.includes(expectedOutput)) {
+      const expectedValues = Array.isArray(expectedOutput)
+        ? expectedOutput
+        : [expectedOutput];
+      const missing = expectedValues.filter(
+        (value) => !output.includes(value),
+      );
+      if (code !== 0 || missing.length > 0) {
         reject(
           new Error(
-            `${output}\nSaída esperada não encontrada: ${expectedOutput}`,
+            `${output}\nSaída esperada não encontrada: ${missing.join(", ")}`,
           ),
         );
         return;

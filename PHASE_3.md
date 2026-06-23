@@ -2,9 +2,7 @@
 
 ## Estado
 
-Planejada em 2026-06-23.
-
-Este plano deve ser seguido antes de iniciar a integração com atalhos globais da Fase 4.
+Concluída em 2026-06-23.
 
 ## Objetivo
 
@@ -103,13 +101,42 @@ Cápsula renderer
 
 ## Critérios de saída
 
-- Painel e cápsula abrem sem erro.
-- A cápsula não recebe foco.
-- A cápsula acompanha todos os estados.
-- O indicador de volume reage durante a gravação.
-- Fechar o painel mantém o aplicativo ativo.
-- O painel pode ser reaberto pela bandeja.
-- A opção **Sair** encerra todas as janelas.
-- Transcrição e clipboard da Fase 2 continuam funcionando.
-- Testes automatizados e revisão visual aprovados.
+- [x] Painel e cápsula abrem sem erro.
+- [x] A cápsula não recebe foco.
+- [x] A cápsula acompanha todos os estados.
+- [x] O indicador de volume reage durante a gravação.
+- [x] Fechar o painel mantém o aplicativo ativo.
+- [x] O painel pode ser reaberto pela bandeja.
+- [x] A opção **Sair** encerra todas as janelas.
+- [x] Transcrição e clipboard da Fase 2 continuam funcionando.
+- [x] Testes automatizados e revisão visual aprovados.
 
+## Resultado
+
+- Janela principal persistente.
+- Cápsula transparente, sem moldura, sempre no topo e sem foco.
+- Posicionamento no centro inferior da área útil do monitor.
+- Reposicionamento em mudanças de tela.
+- Estados:
+  - ouvindo;
+  - transcrevendo;
+  - texto copiado;
+  - erro.
+- Indicador de áudio e cronômetro durante gravação.
+- Bandeja com abrir, mostrar/ocultar, perfil ativo e sair.
+- Fechar o painel oculta a janela sem encerrar o aplicativo.
+
+## Validação
+
+- 11 testes unitários aprovados.
+- Smoke test das duas janelas aprovado.
+- Teste de bandeja aprovado.
+- Teste de ciclo fechar/reabrir aprovado.
+- Cápsula confirmada como não focalizável.
+- Teste de microfone aprovado.
+- Teste de transcrição e clipboard aprovado.
+- Revisão visual dos quatro estados aprovada.
+
+## Próxima fase
+
+Implementar atalho global e inserção automática no aplicativo anteriormente ativo.

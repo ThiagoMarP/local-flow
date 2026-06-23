@@ -1,6 +1,6 @@
 {
   "name": "local-flow",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Aplicativo local de ditado e transcrição para Windows",
   "type": "module",
@@ -13,11 +13,15 @@
     "smoke": "node scripts/electron-smoke.mjs",
     "test:e2e": "node scripts/electron-e2e.mjs",
     "test:mic": "node scripts/electron-mic-test.mjs",
+    "test:tray": "node scripts/electron-tray-test.mjs",
+    "test:lifecycle": "node scripts/electron-lifecycle-test.mjs",
     "capture:ui": "node scripts/capture-ui.mjs",
+    "capture:capsule": "node scripts/capture-capsule.mjs",
     "record:samples": "node scripts/record-samples.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "phase1:check": "node scripts/check-phase1.mjs",
-    "phase2:check": "node scripts/check-phase2.mjs"
+    "phase2:check": "node scripts/check-phase2.mjs",
+    "phase3:check": "node scripts/check-phase3.mjs"
   },
   "engines": {
     "node": ">=22"

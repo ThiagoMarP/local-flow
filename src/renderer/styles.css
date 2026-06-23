@@ -207,6 +207,37 @@ textarea:focus {
   padding: 22px;
 }
 
+.tray-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 18px 22px;
+}
+
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.demo-button {
+  border: 1px solid #ffffff12;
+  border-radius: 999px;
+  padding: 8px 11px;
+  background: #1b202b;
+  color: #9da7ba;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.demo-button:hover {
+  border-color: #7085ff66;
+  color: #eef1f8;
+}
+
 .result-meta {
   margin: 0;
   color: #8791a5;
@@ -234,6 +265,15 @@ textarea {
 
   .header {
     flex-direction: column;
+  }
+
+  .tray-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .demo-controls {
+    justify-content: flex-start;
   }
 }
 
