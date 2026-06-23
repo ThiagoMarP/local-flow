@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld("localFlow", {
       vocabulary,
     }),
   copyText: (text) => ipcRenderer.invoke("clipboard:write", text),
+  reportSelfTest: (result) => ipcRenderer.invoke("selftest:report", result),
 });

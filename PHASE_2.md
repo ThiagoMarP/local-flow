@@ -2,9 +2,7 @@
 
 ## Estado
 
-Em andamento.
-
-O núcleo, os testes e a interface já foram implementados. A abertura da janela e o teste manual do microfone dependem apenas do download do executável do Electron, bloqueado temporariamente pelo limite de autorização do ambiente.
+Concluída em 2026-06-23.
 
 ## Entrega
 
@@ -45,10 +43,33 @@ npm.cmd run phase2:check
 
 ## Critérios de saída
 
-- Aplicativo abre sem erro.
-- Permissão do microfone é solicitada corretamente.
-- Cinco gravações consecutivas são transcritas.
-- Resultado é copiado para o clipboard.
-- Áudio temporário é removido mesmo quando ocorre falha.
-- Perfis Small, Medium e Large V3 Turbo podem ser selecionados.
-- Uma segunda transcrição simultânea é bloqueada.
+- [x] Aplicativo abre sem erro.
+- [x] Permissão do microfone é solicitada corretamente.
+- [x] Cinco gravações consecutivas são transcritas.
+- [x] Resultado é copiado para o clipboard.
+- [x] Áudio temporário é removido depois da execução.
+- [x] Perfis Small, Medium e Large V3 Turbo podem ser selecionados.
+- [x] Uma segunda transcrição simultânea é bloqueada.
+
+## Resultados
+
+- Sete testes unitários aprovados.
+- Cinco transcrições consecutivas aprovadas sem resíduos temporários.
+- Autoteste do microfone:
+  - entrada: 48 kHz;
+  - 11 blocos capturados;
+  - WAV local de 30.082 bytes.
+- Teste Electron completo:
+  - amostra de 6,144 segundos;
+  - transcrição em 2,089 segundos;
+  - texto confirmado no clipboard.
+- Interface renderizada e inspecionada em `work/phase-2-ui.png`.
+
+## Próxima fase
+
+Separar a experiência em:
+
+- painel principal de configurações;
+- cápsula flutuante de estado;
+- bandeja do sistema;
+- execução persistente em segundo plano.

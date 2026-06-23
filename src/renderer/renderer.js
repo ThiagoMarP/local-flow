@@ -177,8 +177,35 @@ async function initialize() {
     }
 
     setStatus("idle", "Pronto para gravar.");
+    if (
+      new URLSearchParams(window.location.search).get("selfTest") ===
+      "microphone"
+    ) {
+      await runMicrophoneSelfTest();
+    }
   } catch (error) {
     setStatus("error", `Falha ao iniciar: ${error.message}`);
+  }
+}
+
+async function runMicrophoneSelfTest() {
+  try {
+    await startRecording();
+    if (state !== "recording") {
+      throw new Error(statusElement.textContent);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const wav = buildWav();
+    await stopAudioGraph();
+    await window.localFlow.reportSelfTest({
+      wavBytes: wav.byteLength,
+      chunks: chunks.length,
+      inputSampleRate: audioContext.sampleRate,
+    });
+  } catch (error) {
+    await window.localFlow.reportSelfTest({
+      error: error.message,
+    });
   }
 }
 

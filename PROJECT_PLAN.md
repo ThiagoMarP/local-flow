@@ -21,8 +21,8 @@ Criar um aplicativo Windows de ditado local, sem limite de palavras, com:
 |---|---|---|
 | 0. Arquitetura e ambiente | Concluída | Stack e restrições definidas |
 | 1. Benchmark do Whisper | Concluída | Perfis Small, Medium e Large V3 Turbo definidos |
-| 2. Núcleo funcional | Em andamento | Microfone → transcrição → clipboard |
-| 3. Aplicativo desktop | Pendente | Interface e cápsula flutuante |
+| 2. Núcleo funcional | Concluída | Microfone → transcrição → clipboard |
+| 3. Aplicativo desktop | Planejada | Interface, cápsula e bandeja do sistema |
 | 4. Integração com Windows | Pendente | Atalho e inserção automática |
 | 5. Estabilidade | Pendente | Configurações, privacidade e recuperação |
 | 6. Revisão inteligente | Pendente | Modos de limpeza pelo Ollama |

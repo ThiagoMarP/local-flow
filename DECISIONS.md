@@ -37,3 +37,11 @@ O dicionário pessoal será convertido em um prompt inicial do Whisper. O benchm
 ## 2026-06-23 — CPU primeiro
 
 O MVP usará CPU com até 24 threads. Vulkan pode reduzir latência na Radeon 890M, mas exige uma cadeia de compilação adicional. Essa otimização será avaliada depois do pipeline funcional.
+
+## 2026-06-23 — Captura no renderer, transcrição no processo principal
+
+O renderer captura e converte o microfone para WAV PCM de 16 kHz. O processo principal valida o arquivo, executa o `whisper.cpp`, controla arquivos temporários e escreve no clipboard. A ponte expõe apenas operações específicas por `contextBridge`.
+
+## 2026-06-23 — Janela persistente e bandeja
+
+A partir da Fase 3, fechar o painel principal ocultará a janela em vez de encerrar o aplicativo. O encerramento explícito ficará disponível na bandeja do sistema.

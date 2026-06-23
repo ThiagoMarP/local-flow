@@ -1,4 +1,5 @@
 const { app, BrowserWindow, clipboard, ipcMain, session } = require("electron");
+const { mkdir, readFile, writeFile } = require("node:fs/promises");
 const path = require("node:path");
 const {
   inspectRuntime,
@@ -9,7 +10,16 @@ const projectRoot = path.resolve(__dirname, "..", "..");
 let mainWindow;
 let transcriptionRunning = false;
 
+if (process.env.LOCAL_FLOW_USER_DATA) {
+  app.setPath("userData", path.resolve(process.env.LOCAL_FLOW_USER_DATA));
+}
+
 function createWindow() {
+  const automatedRun =
+    process.env.LOCAL_FLOW_SMOKE_TEST === "1" ||
+    Boolean(process.env.LOCAL_FLOW_CAPTURE_PATH) ||
+    Boolean(process.env.LOCAL_FLOW_E2E_AUDIO) ||
+    process.env.LOCAL_FLOW_MIC_SELF_TEST === "1";
   mainWindow = new BrowserWindow({
     width: 820,
     height: 720,
@@ -17,6 +27,8 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: "#0b0d12",
     title: "Local Flow",
+    show:
+      !automatedRun || Boolean(process.env.LOCAL_FLOW_CAPTURE_PATH),
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "preload.cjs"),
       contextIsolation: true,
@@ -32,14 +44,61 @@ function createWindow() {
       event.preventDefault();
     }
   });
+  const query =
+    process.env.LOCAL_FLOW_MIC_SELF_TEST === "1"
+      ? { selfTest: "microphone" }
+      : undefined;
   mainWindow.loadFile(
     path.join(__dirname, "..", "renderer", "index.html"),
+    query ? { query } : undefined,
   );
 
-  mainWindow.webContents.once("did-finish-load", () => {
+  mainWindow.webContents.once("did-finish-load", async () => {
     console.log("LOCAL_FLOW_READY");
     if (process.env.LOCAL_FLOW_SMOKE_TEST === "1") {
       setTimeout(() => app.quit(), 500);
+      return;
+    }
+    if (process.env.LOCAL_FLOW_CAPTURE_PATH) {
+      try {
+        const target = path.resolve(process.env.LOCAL_FLOW_CAPTURE_PATH);
+        await mkdir(path.dirname(target), { recursive: true });
+        mainWindow.show();
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const image = await mainWindow.webContents.capturePage();
+        await writeFile(target, image.toPNG());
+        console.log(`LOCAL_FLOW_CAPTURED=${target}`);
+        app.quit();
+      } catch (error) {
+        console.error(
+          `LOCAL_FLOW_CAPTURE_ERROR=${error.stack || error.message}`,
+        );
+        app.exit(1);
+      }
+      return;
+    }
+    if (process.env.LOCAL_FLOW_E2E_AUDIO) {
+      try {
+        const wavBuffer = await readFile(
+          path.resolve(process.env.LOCAL_FLOW_E2E_AUDIO),
+        );
+        const result = await transcribeWav({
+          projectRoot,
+          wavBuffer,
+          profile: "fast",
+          vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
+          threads: 24,
+        });
+        clipboard.writeText(result.text);
+        if (clipboard.readText() !== result.text) {
+          throw new Error("O clipboard não preservou o texto transcrito.");
+        }
+        console.log(`LOCAL_FLOW_E2E_OK=${JSON.stringify(result)}`);
+        app.quit();
+      } catch (error) {
+        console.error(`LOCAL_FLOW_E2E_ERROR=${error.stack || error.message}`);
+        app.exit(1);
+      }
     }
   });
 }
@@ -122,5 +181,14 @@ ipcMain.handle("transcription:run", async (_event, payload) => {
 
 ipcMain.handle("clipboard:write", (_event, text) => {
   clipboard.writeText(String(text));
+  return true;
+});
+
+ipcMain.handle("selftest:report", (_event, result) => {
+  if (process.env.LOCAL_FLOW_MIC_SELF_TEST !== "1") {
+    throw new Error("O autoteste do microfone não está habilitado.");
+  }
+  console.log(`LOCAL_FLOW_MIC_OK=${JSON.stringify(result)}`);
+  setTimeout(() => app.quit(), 100);
   return true;
 });
