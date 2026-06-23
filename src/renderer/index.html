@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:;"
+    />
+    <title>Local Flow</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Fase 2 · núcleo local</p>
+          <h1>Local Flow</h1>
+          <p class="subtitle">
+            Grave uma frase, transcreva com o Whisper local e copie o resultado.
+          </p>
+        </div>
+        <div class="privacy">
+          <span class="privacy-dot"></span>
+          Offline
+        </div>
+      </header>
+
+      <section class="panel recorder-panel">
+        <div class="status-row">
+          <div>
+            <p class="label">Estado</p>
+            <p class="status" id="status">Verificando o mecanismo local…</p>
+          </div>
+          <p class="timer" id="timer">00:00</p>
+        </div>
+
+        <div class="meter" aria-hidden="true">
+          <span id="meterFill"></span>
+        </div>
+
+        <div class="controls">
+          <button class="button primary" id="recordButton" disabled>
+            Iniciar gravação
+          </button>
+          <button class="button danger" id="stopButton" disabled>
+            Parar e transcrever
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-grid">
+        <label class="field panel">
+          <span>Perfil do modelo</span>
+          <select id="profileSelect">
+            <option value="fast">Rápido · Small</option>
+            <option value="standard" selected>Padrão · Medium</option>
+            <option value="accurate">Precisão · Large V3 Turbo</option>
+          </select>
+        </label>
+
+        <label class="field panel">
+          <span>Vocabulário de contexto</span>
+          <input
+            id="vocabularyInput"
+            type="text"
+            value="Electron, TypeScript, Whisper, Ollama"
+            placeholder="Termos separados por vírgula"
+          />
+        </label>
+      </section>
+
+      <section class="panel result-panel">
+        <div class="result-header">
+          <div>
+            <p class="label">Transcrição</p>
+            <p class="result-meta" id="resultMeta">
+              O resultado será copiado automaticamente.
+            </p>
+          </div>
+          <button class="button secondary" id="copyButton" disabled>
+            Copiar novamente
+          </button>
+        </div>
+        <textarea
+          id="resultText"
+          readonly
+          placeholder="Sua transcrição aparecerá aqui."
+        ></textarea>
+      </section>
+
+      <p class="footnote">
+        O arquivo de áudio é temporário e removido após a transcrição.
+      </p>
+    </main>
+
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>
+
