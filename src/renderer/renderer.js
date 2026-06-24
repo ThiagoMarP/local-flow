@@ -1,4 +1,5 @@
 import { joinAndEncode } from "./audio.js";
+import { createSettingsController } from "./settings-controller.js";
 
 const recordButton = document.querySelector("#recordButton");
 const stopButton = document.querySelector("#stopButton");
@@ -15,6 +16,36 @@ const shortcutStatus = document.querySelector("#shortcutStatus");
 const shortcutDescription = document.querySelector(
   "#shortcutDescription",
 );
+const microphoneSelect = document.querySelector("#microphoneSelect");
+const shortcutSelect = document.querySelector("#shortcutSelect");
+const maxDurationSelect = document.querySelector("#maxDurationSelect");
+const autoPasteInput = document.querySelector("#autoPasteInput");
+const restoreClipboardInput = document.querySelector(
+  "#restoreClipboardInput",
+);
+const launchAtLoginInput = document.querySelector(
+  "#launchAtLoginInput",
+);
+const startMinimizedInput = document.querySelector(
+  "#startMinimizedInput",
+);
+const settingsSaveStatus = document.querySelector(
+  "#settingsSaveStatus",
+);
+const settingsController = createSettingsController({
+  profileSelect,
+  vocabularyInput,
+  microphoneSelect,
+  shortcutSelect,
+  maxDurationSelect,
+  autoPasteInput,
+  restoreClipboardInput,
+  launchAtLoginInput,
+  startMinimizedInput,
+  shortcutKey,
+  shortcutStatus,
+  settingsSaveStatus,
+});
 
 let audioContext;
 let sourceNode;
@@ -28,6 +59,7 @@ let state = "booting";
 let lastLevelPublish = 0;
 let recordingSource = "manual";
 let pendingShortcutStop = false;
+let maxDurationStopRequested = false;
 
 function capsuleState(nextState) {
   if (nextState === "requesting") return "processing";
@@ -64,6 +96,9 @@ function setStatus(nextState, message) {
     state === "recording" || state === "processing";
   vocabularyInput.disabled =
     state === "recording" || state === "processing";
+  settingsController.setDisabled(
+    state === "recording" || state === "processing",
+  );
   publishUiState();
 }
 
@@ -78,6 +113,15 @@ function updateTimer() {
   const elapsedMs = Date.now() - recordingStartedAt;
   timerElement.textContent = formatDuration(elapsedMs);
   publishUiState({ elapsedMs });
+  if (
+    state === "recording" &&
+    !maxDurationStopRequested &&
+    settingsController.get()?.maxRecordingSeconds &&
+    elapsedMs >= settingsController.get().maxRecordingSeconds * 1000
+  ) {
+    maxDurationStopRequested = true;
+    stopAndTranscribe(recordingSource);
+  }
 }
 
 function buildWav() {
@@ -87,15 +131,37 @@ function buildWav() {
 async function startRecording(source = "manual") {
   try {
     recordingSource = source;
+    maxDurationStopRequested = false;
     setStatus("requesting", "Solicitando acesso ao microfone…");
-    microphoneStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+    const audioOptions = {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+    if (
+      settingsController.get()?.microphoneId &&
+      settingsController.get().microphoneId !== "default"
+    ) {
+      audioOptions.deviceId = {
+        exact: settingsController.get().microphoneId,
+      };
+    }
+    try {
+      microphoneStream = await navigator.mediaDevices.getUserMedia({
+        audio: audioOptions,
+      });
+    } catch (error) {
+      if (error.name !== "OverconstrainedError") throw error;
+      microphoneStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    }
 
     audioContext = new AudioContext();
     sourceNode = audioContext.createMediaStreamSource(microphoneStream);
@@ -165,6 +231,19 @@ async function stopAudioGraph() {
     await audioContext.close();
   }
   meterFill.style.width = "0";
+}
+
+async function cancelRecording(reason = "cancelled") {
+  pendingShortcutStop = false;
+  maxDurationStopRequested = false;
+  await stopAudioGraph();
+  chunks = [];
+  timerElement.textContent = "00:00";
+  setStatus("idle", "Pronto para gravar.");
+  window.localFlow.reportDictationEvent({
+    type: "cancelled",
+    source: reason,
+  });
 }
 
 async function stopAndTranscribe(source = recordingSource) {
@@ -266,6 +345,10 @@ window.localFlow.onDictationCommand(async (command) => {
   }
   if (command?.action === "stop" && state === "requesting") {
     pendingShortcutStop = true;
+    return;
+  }
+  if (command?.action === "cancel") {
+    await cancelRecording(command.source);
   }
 });
 
@@ -288,6 +371,14 @@ async function initialize() {
       if (firstAvailable) profileSelect.value = firstAvailable.value;
     }
 
+    await settingsController.initialize(runtime.settings);
+    if (
+      new URLSearchParams(window.location.search).get(
+        "settingsPreview",
+      ) === "1"
+    ) {
+      document.querySelector(".advanced-panel").open = true;
+    }
     shortcutKey.textContent = runtime.shortcut.display;
     shortcutDescription.textContent =
       runtime.shortcut.mode === "toggle"

@@ -8,6 +8,10 @@ export async function runElectron({
   expectedOutput,
   timeoutMs = 30000,
   onSpawn,
+  onOutput,
+  electronArgs = [],
+  userDataPath: providedUserDataPath,
+  cleanupUserData = true,
 }) {
   const electronPath = path.join(
     process.cwd(),
@@ -17,15 +21,17 @@ export async function runElectron({
     "electron.exe",
   );
   await access(electronPath);
-  const userDataPath = path.join(
-    os.tmpdir(),
-    "local-flow-electron-test",
-    `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  );
+  const userDataPath =
+    providedUserDataPath ||
+    path.join(
+      os.tmpdir(),
+      "local-flow-electron-test",
+      `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    );
   await mkdir(userDataPath, { recursive: true });
 
   return new Promise((resolve, reject) => {
-    const child = spawn(electronPath, ["."], {
+    const child = spawn(electronPath, [...electronArgs, "."], {
       cwd: process.cwd(),
       env: {
         ...process.env,
@@ -40,10 +46,14 @@ export async function runElectron({
     });
     let output = "";
     child.stdout.on("data", (chunk) => {
-      output += chunk.toString();
+      const text = chunk.toString();
+      output += text;
+      onOutput?.(text, child);
     });
     child.stderr.on("data", (chunk) => {
-      output += chunk.toString();
+      const text = chunk.toString();
+      output += text;
+      onOutput?.(text, child);
     });
 
     const timeout = setTimeout(() => {
@@ -57,9 +67,11 @@ export async function runElectron({
 
     child.on("close", async (code) => {
       clearTimeout(timeout);
-      await rm(userDataPath, { recursive: true, force: true }).catch(
-        () => {},
-      );
+      if (cleanupUserData) {
+        await rm(userDataPath, { recursive: true, force: true }).catch(
+          () => {},
+        );
+      }
       const expectedValues = Array.isArray(expectedOutput)
         ? expectedOutput
         : [expectedOutput];

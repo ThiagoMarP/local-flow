@@ -61,3 +61,23 @@ O atalho inicial será `Ctrl+Shift+Espaço`: um toque inicia e o segundo encerra
 ## 2026-06-23 — Auxiliar Windows persistente
 
 Captura de janela, retorno de foco e colagem são executados por um processo PowerShell local persistente com chamadas diretas ao `user32.dll`. Isso evita dependências nativas externas e reduz a latência de inicialização.
+
+## 2026-06-23 — Configuração local versionada
+
+As preferências ficam em `settings.json` dentro de `userData`. Toda
+leitura passa por normalização de schema, atualizações são parciais e a
+gravação usa arquivo temporário seguido de renomeação. Um arquivo
+inválido é preservado como backup e substituído pelos padrões.
+
+## 2026-06-23 — Logs sem conteúdo do usuário
+
+Logs são JSONL locais e registram apenas metadados operacionais.
+Áudio, transcrição, clipboard, vocabulário e campos equivalentes são
+redigidos. Crash reports permanecem locais e não são enviados.
+
+## 2026-06-23 — Cápsula carregada sob demanda
+
+No uso normal, o renderer da cápsula só é criado quando o estado deixa
+de ser ocioso. Isso reduz o consumo em repouso sem alterar a experiência
+durante o ditado. Os testes automatizados mantêm criação imediata para
+validar foco, posição e renderização.

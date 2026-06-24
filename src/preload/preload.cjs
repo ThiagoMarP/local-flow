@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld("localFlow", {
   },
   reportDictationEvent: (event) =>
     ipcRenderer.send("dictation:event", event),
+  getSettings: () => ipcRenderer.invoke("settings:get"),
+  updateSettings: (patch) =>
+    ipcRenderer.invoke("settings:update", patch),
+  resetSettings: () => ipcRenderer.invoke("settings:reset"),
   showDashboard: () => ipcRenderer.invoke("app:show-dashboard"),
   hideDashboard: () => ipcRenderer.invoke("app:hide-dashboard"),
 });

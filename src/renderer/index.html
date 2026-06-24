@@ -86,6 +86,73 @@
         <span class="shortcut-status" id="shortcutStatus">Verificando…</span>
       </section>
 
+      <details class="panel advanced-panel">
+        <summary>
+          <span>
+            <strong>Configurações</strong>
+            <small>Privacidade, microfone e comportamento</small>
+          </span>
+          <span class="settings-save-status" id="settingsSaveStatus">
+            Salvo localmente
+          </span>
+        </summary>
+
+        <div class="advanced-grid">
+          <label class="field compact">
+            <span>Microfone</span>
+            <select id="microphoneSelect">
+              <option value="default">Padrão do Windows</option>
+            </select>
+          </label>
+
+          <label class="field compact">
+            <span>Atalho</span>
+            <select id="shortcutSelect"></select>
+          </label>
+
+          <label class="field compact">
+            <span>Duração máxima</span>
+            <select id="maxDurationSelect">
+              <option value="60">1 minuto</option>
+              <option value="120">2 minutos</option>
+              <option value="300">5 minutos</option>
+              <option value="600">10 minutos</option>
+            </select>
+          </label>
+
+          <div class="toggle-list">
+            <label class="toggle-row">
+              <input id="autoPasteInput" type="checkbox" />
+              <span>
+                <strong>Colar automaticamente</strong>
+                <small>Insere no aplicativo anteriormente ativo.</small>
+              </span>
+            </label>
+            <label class="toggle-row">
+              <input id="restoreClipboardInput" type="checkbox" />
+              <span>
+                <strong>Restaurar texto do clipboard</strong>
+                <small>Após uma colagem bem-sucedida.</small>
+              </span>
+            </label>
+            <label class="toggle-row">
+              <input id="launchAtLoginInput" type="checkbox" />
+              <span>
+                <strong>Iniciar com o Windows</strong>
+                <small>Executa o Local Flow após entrar na conta.</small>
+              </span>
+            </label>
+            <label class="toggle-row">
+              <input id="startMinimizedInput" type="checkbox" />
+              <span>
+                <strong>Iniciar minimizado</strong>
+                <small>Mantém somente o ícone na bandeja.</small>
+              </span>
+            </label>
+          </div>
+        </div>
+      </details>
+
       <section class="panel result-panel">
         <div class="result-header">
           <div>

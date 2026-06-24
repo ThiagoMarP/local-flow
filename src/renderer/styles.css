@@ -243,6 +243,92 @@ textarea:focus {
   color: #ff8297;
 }
 
+.advanced-panel {
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.advanced-panel summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  padding: 17px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.advanced-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-panel summary strong,
+.toggle-row strong {
+  display: block;
+  color: #eef1f8;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.advanced-panel summary small,
+.toggle-row small {
+  display: block;
+  margin-top: 4px;
+  color: #7f899d;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.settings-save-status {
+  color: #68dca4;
+  font-size: 11px;
+}
+
+.settings-save-status.saving {
+  color: #9facbf;
+}
+
+.settings-save-status.error {
+  color: #ff8297;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 20px 20px;
+}
+
+.field.compact {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.toggle-list {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.toggle-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #ffffff0f;
+  border-radius: 13px;
+  background: #090d14a6;
+}
+
+.toggle-row input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: #7186ff;
+}
+
 .tray-panel {
   display: flex;
   justify-content: space-between;
@@ -311,6 +397,11 @@ textarea {
   .shortcut-panel {
     grid-template-columns: 1fr;
     align-items: flex-start;
+  }
+
+  .advanced-grid,
+  .toggle-list {
+    grid-template-columns: 1fr;
   }
 
   .demo-controls {

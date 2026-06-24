@@ -1,20 +1,23 @@
 const {
   app,
-  BrowserWindow,
   clipboard,
+  crashReporter,
   globalShortcut,
   ipcMain,
-  Menu,
-  nativeImage,
-  screen,
+  powerMonitor,
   session,
-  Tray,
 } = require("electron");
-const { mkdir, readFile, writeFile } = require("node:fs/promises");
+const { mkdir, writeFile } = require("node:fs/promises");
+const os = require("node:os");
 const path = require("node:path");
+const { ClipboardService } = require("./services/clipboard-service.cjs");
+const { cleanOldEntries } = require("./services/housekeeping.cjs");
+const { LoginItemService } = require("./services/login-item-service.cjs");
+const { PrivacyLogger } = require("./services/privacy-logger.cjs");
+const { SettingsStore } = require("./services/settings-store.cjs");
+const { TestHarness } = require("./services/test-harness.cjs");
+const { WindowManager } = require("./services/window-manager.cjs");
 const { ToggleDictationController } = require("./shortcut-controller.cjs");
-const { calculateCapsuleBounds } = require("./window-layout.cjs");
-const { normalizeUiState } = require("./ui-state.cjs");
 const { WindowsBridge } = require("./windows-bridge.cjs");
 const {
   inspectRuntime,
@@ -22,7 +25,12 @@ const {
 } = require("./whisper-service.cjs");
 
 const projectRoot = path.resolve(__dirname, "..", "..");
-const DICTATION_SHORTCUT = "CommandOrControl+Shift+Space";
+const startupStartedAt = Date.now();
+const singleInstanceTestRun =
+  process.env.LOCAL_FLOW_SINGLE_INSTANCE_TEST === "1";
+const settingsTestRun =
+  Boolean(process.env.LOCAL_FLOW_SETTINGS_TEST_WRITE) ||
+  Boolean(process.env.LOCAL_FLOW_SETTINGS_TEST_EXPECT);
 const automatedRun =
   process.env.LOCAL_FLOW_SMOKE_TEST === "1" ||
   Boolean(process.env.LOCAL_FLOW_CAPTURE_PATH) ||
@@ -33,261 +41,59 @@ const automatedRun =
   process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1" ||
   process.env.LOCAL_FLOW_SHORTCUT_TEST === "1" ||
   Boolean(process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE) ||
-  Boolean(process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO);
+  Boolean(process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO) ||
+  settingsTestRun ||
+  process.env.LOCAL_FLOW_METRICS_TEST === "1";
 const persistentWindowRun =
   !automatedRun || process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1";
 
-let dashboardWindow;
-let capsuleWindow;
-let tray;
-let transcriptionRunning = false;
-let isQuitting = false;
-let capsuleHideTimer;
-let activeProfile = "standard";
-let currentUiState = normalizeUiState({
-  state: "idle",
-  message: "Pronto",
-  profile: activeProfile,
-});
+let settingsStore;
+let logger;
 let windowsBridge;
+let clipboardService;
+let loginItemService;
+let windowManager;
+let testHarness;
 let shortcutController;
 let shortcutRegistered = false;
 let shortcutRegistrationError = "";
+let activeShortcut = "CommandOrControl+Shift+Space";
+let transcriptionRunning = false;
+let activeProfile = "standard";
 
 if (process.env.LOCAL_FLOW_USER_DATA) {
   app.setPath("userData", path.resolve(process.env.LOCAL_FLOW_USER_DATA));
 }
+if (singleInstanceTestRun) app.disableHardwareAcceleration();
+app.setPath(
+  "crashDumps",
+  path.join(app.getPath("userData"), "crashes"),
+);
+crashReporter.start({
+  uploadToServer: false,
+  productName: "Local Flow",
+});
 
-function secureWindow(window) {
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.webContents.on("will-navigate", (event, url) => {
-    if (!url.startsWith("file://")) {
-      event.preventDefault();
-    }
-  });
-}
+const hasSingleInstanceLock = automatedRun
+  ? true
+  : app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
 
-function createDashboardWindow() {
-  dashboardWindow = new BrowserWindow({
-    width: 820,
-    height: 720,
-    minWidth: 680,
-    minHeight: 600,
-    backgroundColor: "#0b0d12",
-    title: "Local Flow",
-    show:
-      !automatedRun ||
-      Boolean(process.env.LOCAL_FLOW_CAPTURE_PATH) ||
-      process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1",
-    webPreferences: {
-      preload: path.join(__dirname, "..", "preload", "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      backgroundThrottling: false,
-    },
-  });
-
-  dashboardWindow.removeMenu();
-  secureWindow(dashboardWindow);
-  const query =
-    process.env.LOCAL_FLOW_MIC_SELF_TEST === "1"
-      ? { selfTest: "microphone" }
-      : undefined;
-  dashboardWindow.loadFile(
-    path.join(__dirname, "..", "renderer", "index.html"),
-    query ? { query } : undefined,
-  );
-
-  dashboardWindow.on("close", (event) => {
-    if (!isQuitting && persistentWindowRun) {
-      event.preventDefault();
-      dashboardWindow.hide();
-    }
-  });
-
-  dashboardWindow.webContents.once("did-finish-load", async () => {
-    console.log("LOCAL_FLOW_READY");
-    if (process.env.LOCAL_FLOW_SMOKE_TEST === "1") {
-      setTimeout(() => app.quit(), 500);
-      return;
-    }
-    if (process.env.LOCAL_FLOW_CAPTURE_PATH) {
-      await captureWindow(
-        dashboardWindow,
-        process.env.LOCAL_FLOW_CAPTURE_PATH,
-        "LOCAL_FLOW_CAPTURED",
-      );
-      return;
-    }
-    if (process.env.LOCAL_FLOW_E2E_AUDIO) {
-      await runEndToEndTest(process.env.LOCAL_FLOW_E2E_AUDIO);
-      return;
-    }
-    if (process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO) {
-      await runInsertionTest();
-      return;
-    }
-    if (process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1") {
-      setTimeout(runLifecycleTest, 800);
-    }
-  });
-}
-
-function createCapsuleWindow() {
-  capsuleWindow = new BrowserWindow({
-    width: 420,
-    height: 82,
-    frame: false,
-    transparent: true,
-    backgroundColor: "#00000000",
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    focusable: false,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    show: false,
-    hasShadow: false,
-    webPreferences: {
-      preload: path.join(__dirname, "..", "preload", "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-
-  secureWindow(capsuleWindow);
-  capsuleWindow.setAlwaysOnTop(true, "floating");
-  capsuleWindow.setIgnoreMouseEvents(true);
-  capsuleWindow.loadFile(
-    path.join(__dirname, "..", "renderer", "capsule.html"),
-  );
-  positionCapsule();
-
-  capsuleWindow.webContents.once("did-finish-load", async () => {
-    console.log("LOCAL_FLOW_CAPSULE_READY");
-    capsuleWindow.webContents.send("ui:state", currentUiState);
-    if (process.env.LOCAL_FLOW_CAPTURE_CAPSULE_PATH) {
-      const demoState = normalizeUiState({
-        state: process.env.LOCAL_FLOW_CAPSULE_STATE || "recording",
-        message:
-          {
-            recording: "Ouvindo…",
-            processing: "Transcrevendo…",
-            success: "Texto copiado",
-            error: "Não foi possível transcrever",
-          }[process.env.LOCAL_FLOW_CAPSULE_STATE || "recording"] ||
-          "Local Flow",
-        profile: "standard",
-        elapsedMs:
-          (process.env.LOCAL_FLOW_CAPSULE_STATE || "recording") ===
-          "recording"
-            ? 8400
-            : 0,
-        level: 0.72,
-      });
-      applyUiState(demoState, { autoHide: false });
-      await captureWindow(
-        capsuleWindow,
-        process.env.LOCAL_FLOW_CAPTURE_CAPSULE_PATH,
-        "LOCAL_FLOW_CAPSULE_CAPTURED",
-      );
-    }
-  });
-}
-
-function positionCapsule() {
-  if (!capsuleWindow || capsuleWindow.isDestroyed()) return;
-  let display = screen.getPrimaryDisplay();
-  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
-    display = screen.getDisplayMatching(dashboardWindow.getBounds());
-  }
-  capsuleWindow.setBounds(
-    calculateCapsuleBounds(display.workArea, {
-      width: 420,
-      height: 82,
-      margin: 24,
-    }),
+function formatShortcut(accelerator) {
+  return (
+    settingsStore
+      ?.getPublic()
+      .allowedShortcuts.find((item) => item.value === accelerator)
+      ?.label || accelerator
   );
 }
 
-function createTrayIcon() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
-      <defs>
-        <linearGradient id="g" x1="0" x2="1">
-          <stop stop-color="#6a8bff"/>
-          <stop offset="1" stop-color="#a56eff"/>
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="10" fill="#111620"/>
-      <path d="M8 17h3l2-7 4 13 3-9 2 3h2" fill="none"
-        stroke="url(#g)" stroke-width="2.6" stroke-linecap="round"
-        stroke-linejoin="round"/>
-    </svg>`;
-  return nativeImage
-    .createFromDataURL(
-      `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
-    )
-    .resize({ width: 16, height: 16 });
-}
-
-function rebuildTrayMenu() {
-  if (!tray) return;
-  const profileLabels = {
-    fast: "Rápido · Small",
-    standard: "Padrão · Medium",
-    accurate: "Precisão · Large V3 Turbo",
-  };
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      {
-        label: "Abrir Local Flow",
-        click: showDashboard,
-      },
-      {
-        label: dashboardWindow?.isVisible()
-          ? "Ocultar painel"
-          : "Mostrar painel",
-        click: () => {
-          if (dashboardWindow?.isVisible()) dashboardWindow.hide();
-          else showDashboard();
-          rebuildTrayMenu();
-        },
-      },
-      { type: "separator" },
-      {
-        label: `Perfil: ${profileLabels[activeProfile]}`,
-        enabled: false,
-      },
-      {
-        label: shortcutRegistered
-          ? "Atalho: Ctrl+Shift+Espaço"
-          : "Atalho global indisponível",
-        enabled: false,
-      },
-      { type: "separator" },
-      {
-        label: "Sair",
-        click: () => {
-          isQuitting = true;
-          app.quit();
-        },
-      },
-    ]),
-  );
+function applyUiState(payload, options) {
+  windowManager.applyUiState(payload, options);
 }
 
 function snapshotTextClipboard() {
-  const formats = clipboard.availableFormats();
-  const text = clipboard.readText();
-  return {
-    text,
-    canRestore:
-      text.length > 0 || formats.some((format) => /text/i.test(format)),
-  };
+  return clipboardService.snapshotText();
 }
 
 async function captureDictationTarget() {
@@ -318,77 +124,83 @@ function createShortcutController() {
         message: "Abrindo microfone…",
         profile: activeProfile,
       });
-      dashboardWindow.webContents.send("dictation:command", {
-        action: "start",
-        source: "shortcut",
-      });
+      windowManager.dashboardWindow.webContents.send(
+        "dictation:command",
+        { action: "start", source: "shortcut" },
+      );
     },
     onStop: async () => {
-      dashboardWindow.webContents.send("dictation:command", {
-        action: "stop",
-        source: "shortcut",
-      });
+      windowManager.dashboardWindow.webContents.send(
+        "dictation:command",
+        { action: "stop", source: "shortcut" },
+      );
     },
   });
 }
 
-function registerDictationShortcut() {
-  shortcutRegistered = globalShortcut.register(
-    DICTATION_SHORTCUT,
-    () => {
-      if (process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE) {
-        const target = path.resolve(
-          process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE,
+function handleGlobalShortcut() {
+  if (process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE) {
+    const target = path.resolve(
+      process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE,
+    );
+    mkdir(path.dirname(target), { recursive: true })
+      .then(() =>
+        writeFile(
+          target,
+          JSON.stringify({
+            triggeredAt: new Date().toISOString(),
+            accelerator: activeShortcut,
+          }),
+        ),
+      )
+      .then(() => {
+        console.log("LOCAL_FLOW_SHORTCUT_INPUT_TRIGGERED");
+        app.quit();
+      })
+      .catch((error) => {
+        console.error(
+          `LOCAL_FLOW_SHORTCUT_INPUT_ERROR=${error.stack || error.message}`,
         );
-        mkdir(path.dirname(target), { recursive: true })
-          .then(() =>
-            writeFile(
-              target,
-              JSON.stringify({
-                triggeredAt: new Date().toISOString(),
-                accelerator: DICTATION_SHORTCUT,
-              }),
-            ),
-          )
-          .then(() => {
-            console.log("LOCAL_FLOW_SHORTCUT_INPUT_TRIGGERED");
-            app.quit();
-          })
-          .catch((error) => {
-            console.error(
-              `LOCAL_FLOW_SHORTCUT_INPUT_ERROR=${error.stack || error.message}`,
-            );
-            app.exit(1);
-          });
-        return;
-      }
-      if (process.env.LOCAL_FLOW_SHORTCUT_TEST === "1") {
-        console.log("LOCAL_FLOW_SHORTCUT_TRIGGERED");
-        setTimeout(() => app.quit(), 100);
-        return;
-      }
-      shortcutController.toggle().catch((error) => {
-        shortcutController.fail();
-        applyUiState({
-          state: "error",
-          message: `Atalho falhou: ${error.message}`,
-          profile: activeProfile,
-        });
+        app.exit(1);
       });
-    },
-  );
-  if (!shortcutRegistered) {
-    shortcutRegistrationError =
-      "Ctrl+Shift+Espaço já está sendo usado por outro aplicativo.";
+    return;
   }
+  if (process.env.LOCAL_FLOW_SHORTCUT_TEST === "1") {
+    console.log("LOCAL_FLOW_SHORTCUT_TRIGGERED");
+    setTimeout(() => app.quit(), 100);
+    return;
+  }
+  shortcutController.toggle().catch((error) => {
+    shortcutController.fail();
+    logger.error("shortcut_toggle_failed", error);
+    applyUiState({
+      state: "error",
+      message: "O atalho não pôde iniciar o ditado.",
+      profile: activeProfile,
+    });
+  });
+}
+
+function registerDictationShortcut(shortcut = settingsStore.get().shortcut) {
+  globalShortcut.unregisterAll();
+  activeShortcut = shortcut;
+  shortcutRegistered = globalShortcut.register(
+    activeShortcut,
+    handleGlobalShortcut,
+  );
+  shortcutRegistrationError = shortcutRegistered
+    ? ""
+    : `${formatShortcut(activeShortcut)} já está sendo usado por outro aplicativo.`;
+  windowManager?.setShortcutStatus({
+    registered: shortcutRegistered,
+    display: formatShortcut(activeShortcut),
+  });
   console.log(
     `LOCAL_FLOW_SHORTCUT_READY=${JSON.stringify({
-      accelerator: DICTATION_SHORTCUT,
+      accelerator: activeShortcut,
       registered: shortcutRegistered,
     })}`,
   );
-  rebuildTrayMenu();
-
   if (
     shortcutRegistered &&
     process.env.LOCAL_FLOW_SHORTCUT_TEST === "1"
@@ -397,238 +209,20 @@ function registerDictationShortcut() {
   }
 }
 
-async function pasteShortcutResult(text, target) {
-  clipboard.writeText(text);
-  if (!target?.hwnd || target.isSelf) {
-    return {
-      autoPasted: false,
-      clipboardRestored: false,
-      reason: target?.isSelf ? "local-flow-active" : "target-unavailable",
-    };
-  }
-
-  let pasteResult;
-  try {
-    pasteResult = await windowsBridge.pasteTo(target.hwnd);
-  } catch (error) {
-    return {
-      autoPasted: false,
-      clipboardRestored: false,
-      reason: "windows-helper-failed",
-      diagnostics: { error: error.message },
-    };
-  }
-  if (!pasteResult?.pasted) {
-    return {
-      autoPasted: false,
-      clipboardRestored: false,
-      reason: "focus-or-paste-failed",
-      diagnostics: pasteResult || null,
-    };
-  }
-
-  let clipboardRestored = false;
-  if (target.clipboard?.canRestore) {
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    clipboard.writeText(target.clipboard.text);
-    clipboardRestored = true;
-  }
-  return {
-    autoPasted: true,
-    clipboardRestored,
-    reason: null,
-  };
+function updateShortcut(nextShortcut) {
+  const previous = activeShortcut;
+  registerDictationShortcut(nextShortcut);
+  if (shortcutRegistered) return true;
+  registerDictationShortcut(previous);
+  return false;
 }
 
-function createTray() {
-  tray = new Tray(createTrayIcon());
-  tray.setToolTip("Local Flow — ditado local");
-  tray.on("double-click", showDashboard);
-  rebuildTrayMenu();
-  console.log("LOCAL_FLOW_TRAY_READY");
-  if (process.env.LOCAL_FLOW_TRAY_TEST === "1") {
-    setTimeout(() => app.quit(), 500);
-  }
+async function onDashboardReady(window) {
+  return testHarness.onDashboardReady(window);
 }
 
-function showDashboard() {
-  if (!dashboardWindow || dashboardWindow.isDestroyed()) {
-    createDashboardWindow();
-    return;
-  }
-  dashboardWindow.show();
-  dashboardWindow.focus();
-  rebuildTrayMenu();
-}
-
-function applyUiState(payload, options = {}) {
-  currentUiState = normalizeUiState(payload);
-  if (currentUiState.profile) {
-    activeProfile = currentUiState.profile;
-    rebuildTrayMenu();
-  }
-  if (!capsuleWindow || capsuleWindow.isDestroyed()) return;
-
-  clearTimeout(capsuleHideTimer);
-  capsuleWindow.webContents.send("ui:state", currentUiState);
-  if (currentUiState.state === "idle") {
-    capsuleWindow.hide();
-    return;
-  }
-  positionCapsule();
-  capsuleWindow.showInactive();
-
-  if (
-    options.autoHide !== false &&
-    (currentUiState.state === "success" ||
-      currentUiState.state === "error")
-  ) {
-    const stateAtSchedule = currentUiState.state;
-    capsuleHideTimer = setTimeout(() => {
-      if (currentUiState.state === stateAtSchedule) {
-        currentUiState = normalizeUiState({
-          state: "idle",
-          message: "Pronto",
-          profile: activeProfile,
-        });
-        capsuleWindow.hide();
-      }
-    }, 1800);
-  }
-}
-
-async function captureWindow(window, targetPath, signal) {
-  try {
-    const target = path.resolve(targetPath);
-    await mkdir(path.dirname(target), { recursive: true });
-    window.showInactive();
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    const image = await window.webContents.capturePage();
-    await writeFile(target, image.toPNG());
-    console.log(`${signal}=${target}`);
-    app.quit();
-  } catch (error) {
-    console.error(`${signal}_ERROR=${error.stack || error.message}`);
-    app.exit(1);
-  }
-}
-
-async function runEndToEndTest(audioPath) {
-  try {
-    const wavBuffer = await readFile(path.resolve(audioPath));
-    const result = await transcribeWav({
-      projectRoot,
-      wavBuffer,
-      profile: "fast",
-      vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
-      threads: 24,
-    });
-    clipboard.writeText(result.text);
-    if (clipboard.readText() !== result.text) {
-      throw new Error("O clipboard não preservou o texto transcrito.");
-    }
-    console.log(`LOCAL_FLOW_E2E_OK=${JSON.stringify(result)}`);
-    app.quit();
-  } catch (error) {
-    console.error(`LOCAL_FLOW_E2E_ERROR=${error.stack || error.message}`);
-    app.exit(1);
-  }
-}
-
-async function runInsertionTest() {
-  try {
-    const delayMs = Number(
-      process.env.LOCAL_FLOW_INSERTION_TEST_DELAY_MS || 0,
-    );
-    if (delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-    const target = await windowsBridge.findByTitle(
-      process.env.LOCAL_FLOW_INSERTION_TEST_TITLE,
-    );
-    if (!target) {
-      throw new Error("A janela de teste de inserção não foi encontrada.");
-    }
-    clipboard.writeText("LOCAL_FLOW_CLIPBOARD_ORIGINAL");
-    const dictationTarget = {
-      ...target,
-      isSelf: false,
-      clipboard: snapshotTextClipboard(),
-    };
-    const wavBuffer = await readFile(
-      path.resolve(process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO),
-    );
-    const result = await transcribeWav({
-      projectRoot,
-      wavBuffer,
-      profile: "fast",
-      vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
-      threads: 24,
-    });
-    const insertion = await pasteShortcutResult(
-      result.text,
-      dictationTarget,
-    );
-    if (!insertion.autoPasted) {
-      throw new Error(
-        `A inserção falhou: ${insertion.reason} ${JSON.stringify(insertion.diagnostics)}`,
-      );
-    }
-    if (clipboard.readText() !== "LOCAL_FLOW_CLIPBOARD_ORIGINAL") {
-      throw new Error("O clipboard textual não foi restaurado.");
-    }
-    console.log(
-      `LOCAL_FLOW_INSERTION_OK=${JSON.stringify({
-        text: result.text,
-        ...insertion,
-      })}`,
-    );
-    app.quit();
-  } catch (error) {
-    console.error(
-      `LOCAL_FLOW_INSERTION_ERROR=${error.stack || error.message}`,
-    );
-    app.exit(1);
-  }
-}
-
-async function runLifecycleTest() {
-  try {
-    dashboardWindow.close();
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const hiddenButAlive =
-      !dashboardWindow.isDestroyed() && !dashboardWindow.isVisible();
-    const capsuleDoesNotFocus =
-      typeof capsuleWindow.isFocusable !== "function" ||
-      capsuleWindow.isFocusable() === false;
-    showDashboard();
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const reopened = dashboardWindow.isVisible();
-    if (!tray || !hiddenButAlive || !reopened || !capsuleDoesNotFocus) {
-      throw new Error(
-        JSON.stringify({
-          tray: Boolean(tray),
-          hiddenButAlive,
-          reopened,
-          capsuleDoesNotFocus,
-        }),
-      );
-    }
-    console.log(
-      `LOCAL_FLOW_LIFECYCLE_OK=${JSON.stringify({
-        hiddenButAlive,
-        reopened,
-        capsuleDoesNotFocus,
-      })}`,
-    );
-    isQuitting = true;
-    app.quit();
-  } catch (error) {
-    console.error(
-      `LOCAL_FLOW_LIFECYCLE_ERROR=${error.stack || error.message}`,
-    );
-    app.exit(1);
-  }
+async function onCapsuleReady(window) {
+  return testHarness.onCapsuleReady(window, applyUiState);
 }
 
 function configureMicrophonePermission() {
@@ -639,7 +233,7 @@ function configureMicrophonePermission() {
         details.mediaType === "audio" ||
         details.mediaType === "unknown";
       return (
-        webContents === dashboardWindow?.webContents &&
+        webContents === windowManager.dashboardWindow?.webContents &&
         permission === "media" &&
         requestingOrigin.startsWith("file://") &&
         details?.isMainFrame !== false &&
@@ -655,7 +249,7 @@ function configureMicrophonePermission() {
         mediaTypes.length === 0 ||
         mediaTypes.includes("audio");
       const trustedPage =
-        webContents === dashboardWindow?.webContents &&
+        webContents === windowManager.dashboardWindow?.webContents &&
         details?.isMainFrame !== false &&
         String(details?.requestingUrl || "").startsWith("file://");
       callback(permission === "media" && requestsAudio && trustedPage);
@@ -663,7 +257,62 @@ function configureMicrophonePermission() {
   );
 }
 
-app.whenReady().then(() => {
+if (hasSingleInstanceLock) {
+  app.on("second-instance", () => {
+    windowManager?.showDashboard();
+    if (singleInstanceTestRun) {
+      console.log("LOCAL_FLOW_SINGLE_INSTANCE_OK");
+      app.quit();
+    }
+  });
+}
+
+app.whenReady().then(async () => {
+  if (!hasSingleInstanceLock) return;
+  logger = new PrivacyLogger({
+    directory: path.join(app.getPath("userData"), "logs"),
+  });
+  settingsStore = new SettingsStore({
+    filePath: path.join(app.getPath("userData"), "settings.json"),
+    logger,
+  });
+  await settingsStore.load();
+  if (process.env.LOCAL_FLOW_SETTINGS_TEST_WRITE) {
+    const patch = JSON.parse(process.env.LOCAL_FLOW_SETTINGS_TEST_WRITE);
+    const saved = await settingsStore.update(patch);
+    console.log(`LOCAL_FLOW_SETTINGS_WRITTEN=${JSON.stringify(saved)}`);
+    app.quit();
+    return;
+  }
+  if (process.env.LOCAL_FLOW_SETTINGS_TEST_EXPECT) {
+    const expected = JSON.parse(
+      process.env.LOCAL_FLOW_SETTINGS_TEST_EXPECT,
+    );
+    const current = settingsStore.get();
+    for (const [key, value] of Object.entries(expected)) {
+      if (JSON.stringify(current[key]) !== JSON.stringify(value)) {
+        console.error(
+          `LOCAL_FLOW_SETTINGS_MISMATCH=${JSON.stringify({ key, expected: value, actual: current[key] })}`,
+        );
+        app.exit(1);
+        return;
+      }
+    }
+    console.log(
+      `LOCAL_FLOW_SETTINGS_PERSISTED=${JSON.stringify(expected)}`,
+    );
+    app.quit();
+    return;
+  }
+  const settings = settingsStore.get();
+  activeProfile = settings.profile;
+  const shouldStartHidden =
+    process.argv.includes("--hidden") || settings.startMinimized;
+  if (singleInstanceTestRun) {
+    console.log("LOCAL_FLOW_SINGLE_INSTANCE_PRIMARY_READY");
+    return;
+  }
+
   windowsBridge = new WindowsBridge({
     scriptPath: path.join(
       projectRoot,
@@ -673,48 +322,139 @@ app.whenReady().then(() => {
     ),
   });
   windowsBridge.start();
-  createDashboardWindow();
-  createCapsuleWindow();
+  clipboardService = new ClipboardService({ clipboard, windowsBridge });
+  loginItemService = new LoginItemService({ app, projectRoot });
+  if (!automatedRun && !singleInstanceTestRun) {
+    loginItemService.apply(settings.launchAtLogin);
+  }
+
+  await cleanOldEntries({
+    baseDir: path.join(os.tmpdir(), "local-flow"),
+    prefix: "job-",
+    olderThanMs: 6 * 60 * 60 * 1000,
+    logger,
+  });
+  await logger.prune();
+  await logger.info("app_ready", {
+    version: app.getVersion(),
+    profile: settings.profile,
+    startHidden: shouldStartHidden,
+  });
+  if (process.env.LOCAL_FLOW_METRICS_TEST === "1") {
+    const metrics = app.getAppMetrics();
+    const workingSetKb = metrics.reduce(
+      (total, item) =>
+        total + Number(item.memory?.workingSetSize || 0),
+      0,
+    );
+    console.log(
+      `LOCAL_FLOW_METRICS=${JSON.stringify({
+        startupMs: Date.now() - startupStartedAt,
+        processCount: metrics.length,
+        workingSetMb: Math.round(workingSetKb / 1024),
+        scope: "bootstrap-before-renderers",
+      })}`,
+    );
+    app.quit();
+    return;
+  }
+
+  windowManager = new WindowManager({
+    projectRoot,
+    logger,
+    automatedRun,
+    persistentWindowRun,
+    shouldStartHidden,
+    onDashboardReady,
+    onCapsuleReady,
+    onQuit: () => app.quit(),
+  });
+  testHarness = new TestHarness({
+    app,
+    clipboard,
+    clipboardService,
+    projectRoot,
+    transcribeWav,
+    windowManager,
+    windowsBridge,
+  });
+  windowManager.setProfile(activeProfile);
+  windowManager.createAll({
+    dashboardQuery:
+      process.env.LOCAL_FLOW_MIC_SELF_TEST === "1"
+        ? { selfTest: "microphone" }
+        : process.env.LOCAL_FLOW_SETTINGS_PREVIEW === "1"
+          ? { settingsPreview: "1" }
+        : undefined,
+  });
   configureMicrophonePermission();
   createShortcutController();
   registerDictationShortcut();
+
   if (
     !automatedRun ||
     process.env.LOCAL_FLOW_TRAY_TEST === "1" ||
     process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1"
   ) {
-    createTray();
+    windowManager.createTray();
+    console.log("LOCAL_FLOW_TRAY_READY");
+    if (process.env.LOCAL_FLOW_TRAY_TEST === "1") {
+      setTimeout(() => app.quit(), 500);
+    }
   }
 
-  screen.on("display-metrics-changed", positionCapsule);
-  screen.on("display-added", positionCapsule);
-  screen.on("display-removed", positionCapsule);
-
-  app.on("activate", showDashboard);
+  app.on("activate", () => windowManager.showDashboard());
+  const cancelForSystemState = (reason) => {
+    windowManager.dashboardWindow?.webContents.send(
+      "dictation:command",
+      { action: "cancel", source: reason },
+    );
+    shortcutController?.fail();
+    applyUiState({
+      state: "idle",
+      message: "Pronto",
+      profile: activeProfile,
+    });
+    logger.warn("dictation_cancelled_by_system", { reason });
+  };
+  powerMonitor.on("suspend", () => cancelForSystemState("suspend"));
+  powerMonitor.on("lock-screen", () =>
+    cancelForSystemState("lock-screen"),
+  );
 });
 
-app.on("before-quit", () => {
-  isQuitting = true;
-});
-
+app.on("before-quit", () => windowManager?.beginQuit());
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
   windowsBridge?.dispose();
+  logger?.flush();
 });
-
 app.on("window-all-closed", () => {
   if (automatedRun) app.quit();
+});
+
+process.on("uncaughtException", (error) => {
+  logger?.error("uncaught_exception", error);
+});
+process.on("unhandledRejection", (error) => {
+  logger?.error(
+    "unhandled_rejection",
+    error instanceof Error ? error : new Error("Unhandled rejection"),
+  );
 });
 
 ipcMain.handle("runtime:inspect", async () => ({
   ...(await inspectRuntime(projectRoot)),
   shortcut: {
-    accelerator: DICTATION_SHORTCUT,
-    display: "Ctrl+Shift+Espaço",
+    accelerator: activeShortcut,
+    display: formatShortcut(activeShortcut),
     mode: "toggle",
     registered: shortcutRegistered,
     error: shortcutRegistrationError,
   },
+  settings: settingsStore.getPublic(),
+  loginItem:
+    automatedRun || singleInstanceTestRun ? null : loginItemService.get(),
 }));
 
 ipcMain.handle("transcription:run", async (_event, payload) => {
@@ -727,15 +467,24 @@ ipcMain.handle("transcription:run", async (_event, payload) => {
       ? shortcutController.target
       : null;
   try {
+    const settings = settingsStore.get();
+    const profile = payload?.profile || settings.profile;
+    const vocabulary = Array.isArray(payload?.vocabulary)
+      ? payload.vocabulary
+      : settings.vocabulary;
     const result = await transcribeWav({
       projectRoot,
       wavBuffer: Buffer.from(payload.audio),
-      profile: payload.profile,
-      vocabulary: payload.vocabulary,
+      profile,
+      vocabulary,
       threads: 24,
     });
     const insertion = shortcutTarget
-      ? await pasteShortcutResult(result.text, shortcutTarget)
+      ? await clipboardService.insert(
+          result.text,
+          shortcutTarget,
+          settings,
+        )
       : (() => {
           clipboard.writeText(result.text);
           return {
@@ -745,6 +494,14 @@ ipcMain.handle("transcription:run", async (_event, payload) => {
           };
         })();
     shortcutController?.complete();
+    await logger.info("dictation_completed", {
+      profile,
+      elapsedMs: result.elapsedMs,
+      durationSeconds: result.durationSeconds,
+      autoPasted: insertion.autoPasted,
+      clipboardRestored: insertion.clipboardRestored,
+      fallbackReason: insertion.reason,
+    });
     return {
       ...result,
       copiedToClipboard: true,
@@ -752,6 +509,7 @@ ipcMain.handle("transcription:run", async (_event, payload) => {
     };
   } catch (error) {
     shortcutController?.fail();
+    await logger.error("dictation_failed", error);
     throw error;
   } finally {
     transcriptionRunning = false;
@@ -761,6 +519,59 @@ ipcMain.handle("transcription:run", async (_event, payload) => {
 ipcMain.handle("clipboard:write", (_event, text) => {
   clipboard.writeText(String(text));
   return true;
+});
+
+ipcMain.handle("settings:get", () => settingsStore.getPublic());
+ipcMain.handle("settings:update", async (_event, patch) => {
+  const previous = settingsStore.get();
+  const desiredShortcut = patch?.shortcut || previous.shortcut;
+  if (
+    desiredShortcut !== previous.shortcut &&
+    !updateShortcut(desiredShortcut)
+  ) {
+    throw new Error(`${formatShortcut(desiredShortcut)} já está em uso.`);
+  }
+  try {
+    const next = await settingsStore.update(patch || {});
+    activeProfile = next.profile;
+    if (
+      next.launchAtLogin !== previous.launchAtLogin &&
+      !automatedRun &&
+      !singleInstanceTestRun
+    ) {
+      loginItemService.apply(next.launchAtLogin);
+    }
+    windowManager.setProfile(activeProfile);
+    applyUiState({
+      ...windowManager.currentUiState,
+      profile: activeProfile,
+    });
+    await logger.info("settings_updated", {
+      changedKeys: Object.keys(patch || {}),
+    });
+    return settingsStore.getPublic();
+  } catch (error) {
+    if (desiredShortcut !== previous.shortcut) {
+      updateShortcut(previous.shortcut);
+    }
+    throw error;
+  }
+});
+
+ipcMain.handle("settings:reset", async () => {
+  const previous = settingsStore.get();
+  const defaults = await settingsStore.reset();
+  updateShortcut(defaults.shortcut);
+  activeProfile = defaults.profile;
+  windowManager.setProfile(activeProfile);
+  if (
+    previous.launchAtLogin &&
+    !automatedRun &&
+    !singleInstanceTestRun
+  ) {
+    loginItemService.apply(false);
+  }
+  return settingsStore.getPublic();
 });
 
 ipcMain.handle("selftest:report", (_event, result) => {
@@ -775,22 +586,20 @@ ipcMain.handle("selftest:report", (_event, result) => {
 ipcMain.on("ui:update-state", (_event, payload) => {
   applyUiState(payload);
 });
-
 ipcMain.on("dictation:event", (_event, payload) => {
-  if (payload?.type === "error") {
+  if (["error", "cancelled"].includes(payload?.type)) {
     shortcutController?.fail();
   }
 });
-
-ipcMain.handle("ui:get-state", () => currentUiState);
-
+ipcMain.handle(
+  "ui:get-state",
+  () => windowManager.currentUiState,
+);
 ipcMain.handle("app:show-dashboard", () => {
-  showDashboard();
+  windowManager.showDashboard();
   return true;
 });
-
 ipcMain.handle("app:hide-dashboard", () => {
-  dashboardWindow?.hide();
-  rebuildTrayMenu();
+  windowManager.hideDashboard();
   return true;
 });

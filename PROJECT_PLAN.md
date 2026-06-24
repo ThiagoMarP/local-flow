@@ -23,8 +23,8 @@ Criar um aplicativo Windows de ditado local, sem limite de palavras, com:
 | 1. Benchmark do Whisper | Concluída | Perfis Small, Medium e Large V3 Turbo definidos |
 | 2. Núcleo funcional | Concluída | Microfone → transcrição → clipboard |
 | 3. Aplicativo desktop | Concluída | Interface, cápsula e bandeja do sistema |
-| 4. Integração com Windows | Em andamento | Atalho e inserção automática |
-| 5. Estabilidade | Pendente | Configurações, privacidade e recuperação |
+| 4. Integração com Windows | Concluída | Atalho e inserção automática |
+| 5. Estabilidade | Concluída | Configurações, privacidade, recuperação e otimização |
 | 6. Revisão inteligente | Pendente | Modos de limpeza pelo Ollama |
 | 7. Personalização | Pendente | Dicionário, snippets e perfis |
 | 8. Distribuição | Pendente | Instalador Windows testado |
@@ -123,6 +123,15 @@ Adicionar atalho global, modos pressionar/segurar, preservação do clipboard e 
 ## Fase 5 — Estabilidade
 
 Adicionar configurações, inicialização com Windows, logs sem conteúdo sensível, limpeza automática e recuperação de falhas.
+
+### Resultado
+
+- Configurações persistentes e editáveis na interface.
+- Instância única e inicialização opcional com Windows.
+- Logs locais com redação e retenção.
+- Recuperação de falhas, suspensão e bloqueio de tela.
+- Código dividido em serviços testáveis.
+- Redução aproximada de 13% da memória em repouso com cápsula sob demanda.
 
 ## Fase 6 — Revisão inteligente
 
