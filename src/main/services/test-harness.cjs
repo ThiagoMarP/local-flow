@@ -7,7 +7,7 @@ class TestHarness {
     clipboard,
     clipboardService,
     projectRoot,
-    transcribeWav,
+    transcriptionPipeline,
     windowManager,
     windowsBridge,
   }) {
@@ -15,7 +15,7 @@ class TestHarness {
     this.clipboard = clipboard;
     this.clipboardService = clipboardService;
     this.projectRoot = projectRoot;
-    this.transcribeWav = transcribeWav;
+    this.transcriptionPipeline = transcriptionPipeline;
     this.windowManager = windowManager;
     this.windowsBridge = windowsBridge;
   }
@@ -26,6 +26,12 @@ class TestHarness {
       await mkdir(path.dirname(target), { recursive: true });
       window.showInactive();
       await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (process.env.LOCAL_FLOW_SETTINGS_PREVIEW === "1") {
+        await window.webContents.executeJavaScript(
+          "document.querySelector('.advanced-panel')?.scrollIntoView({block:'start'})",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
       const image = await window.webContents.capturePage();
       await writeFile(target, image.toPNG());
       console.log(`${signal}=${target}`);
@@ -37,27 +43,14 @@ class TestHarness {
   }
 
   async runEndToEnd(audioPath) {
-    try {
-      const wavBuffer = await readFile(path.resolve(audioPath));
-      const result = await this.transcribeWav({
-        projectRoot: this.projectRoot,
-        wavBuffer,
-        profile: "fast",
-        vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
-        threads: 24,
-      });
-      this.clipboard.writeText(result.text);
-      if (this.clipboard.readText() !== result.text) {
-        throw new Error("O clipboard não preservou o texto transcrito.");
-      }
-      console.log(`LOCAL_FLOW_E2E_OK=${JSON.stringify(result)}`);
-      this.app.quit();
-    } catch (error) {
-      console.error(
-        `LOCAL_FLOW_E2E_ERROR=${error.stack || error.message}`,
-      );
-      this.app.exit(1);
-    }
+    return runEndToEndTest({
+      app: this.app,
+      audioPath,
+      clipboard: this.clipboard,
+      transcriptionPipeline: this.transcriptionPipeline,
+      mode: process.env.LOCAL_FLOW_E2E_REVISION_MODE,
+      model: process.env.LOCAL_FLOW_E2E_REVISION_MODEL,
+    });
   }
 
   async runInsertion() {
@@ -85,12 +78,12 @@ class TestHarness {
       const wavBuffer = await readFile(
         path.resolve(process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO),
       );
-      const result = await this.transcribeWav({
-        projectRoot: this.projectRoot,
+      const result = await this.transcriptionPipeline.run({
         wavBuffer,
         profile: "fast",
         vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
         threads: 24,
+        revisionMode: "literal",
       });
       const insertion = await this.clipboardService.insert(
         result.text,
@@ -222,5 +215,61 @@ class TestHarness {
   }
 }
 
-module.exports = { TestHarness };
+async function runRevisionTest({
+  app,
+  audioPath,
+  transcriptionPipeline,
+  mode = "smart",
+  model = "qwen2.5:3b",
+}) {
+  try {
+    const wavBuffer = await readFile(path.resolve(audioPath));
+    const result = await transcriptionPipeline.run({
+      wavBuffer,
+      profile: "fast",
+      vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
+      revisionMode: mode,
+      revisionModel: model,
+      threads: 24,
+    });
+    console.log(`LOCAL_FLOW_REVISION_OK=${JSON.stringify(result)}`);
+    app.quit();
+  } catch (error) {
+    console.error(
+      `LOCAL_FLOW_REVISION_ERROR=${error.stack || error.message}`,
+    );
+    app.exit(1);
+  }
+}
 
+async function runEndToEndTest({
+  app,
+  audioPath,
+  clipboard,
+  transcriptionPipeline,
+  mode = "literal",
+  model = "qwen2.5:3b",
+}) {
+  try {
+    const wavBuffer = await readFile(path.resolve(audioPath));
+    const result = await transcriptionPipeline.run({
+      wavBuffer,
+      profile: "fast",
+      vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
+      threads: 24,
+      revisionMode: mode,
+      revisionModel: model,
+    });
+    clipboard.writeText(result.text);
+    if (clipboard.readText() !== result.text) {
+      throw new Error("O clipboard não preservou o texto transcrito.");
+    }
+    console.log(`LOCAL_FLOW_E2E_OK=${JSON.stringify(result)}`);
+    app.quit();
+  } catch (error) {
+    console.error(`LOCAL_FLOW_E2E_ERROR=${error.stack || error.message}`);
+    app.exit(1);
+  }
+}
+
+module.exports = { TestHarness, runEndToEndTest, runRevisionTest };

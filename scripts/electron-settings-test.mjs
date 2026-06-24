@@ -10,6 +10,8 @@ const patch = {
   profile: "fast",
   vocabulary: ["Local Flow", "Ollama"],
   maxRecordingSeconds: 60,
+  revisionMode: "clean",
+  revisionModel: "qwen2.5:7b",
   autoPaste: false,
   restoreClipboard: false,
   startMinimized: true,
@@ -38,4 +40,3 @@ try {
 } finally {
   await rm(userDataPath, { recursive: true, force: true });
 }
-

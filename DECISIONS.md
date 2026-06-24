@@ -81,3 +81,24 @@ No uso normal, o renderer da cápsula só é criado quando o estado deixa
 de ser ocioso. Isso reduz o consumo em repouso sem alterar a experiência
 durante o ditado. Os testes automatizados mantêm criação imediata para
 validar foco, posição e renderização.
+
+## 2026-06-24 — Ollama opcional e literal por padrão
+
+A revisão por LLM não participa do caminho obrigatório. O modo literal
+não consulta o Ollama e continua sendo o padrão. Os modos limpo e
+inteligente usam `qwen2.5:3b`; o 7B fica disponível para quem aceitar
+maior latência e consumo.
+
+## 2026-06-24 — Fallback como resultado válido
+
+Uma falha de rede local, timeout, JSON inválido ou resposta que altere
+tokens protegidos não gera erro de transcrição. O pipeline entrega o
+texto do Whisper e registra somente o motivo técnico do fallback.
+
+## 2026-06-24 — Revisão conservadora de conteúdo
+
+Números, horários, URLs, e-mails e objetos introduzidos por artigos ou
+determinantes devem permanecer explícitos. Essa regra rejeitou uma
+revisão real que substituiu “atualizar a proposta” por “atualizá-lo”.
+Para este produto, preservar intenção é mais importante do que aplicar
+toda revisão produzida pelo modelo.

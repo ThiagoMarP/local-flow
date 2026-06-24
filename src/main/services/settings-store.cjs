@@ -5,8 +5,14 @@ const {
   writeFile,
 } = require("node:fs/promises");
 const path = require("node:path");
+const {
+  DEFAULT_MODEL,
+  DEFAULT_TIMEOUT_MS,
+  REVISION_MODES,
+  normalizeModel,
+} = require("./revision-service.cjs");
 
-const SETTINGS_VERSION = 1;
+const SETTINGS_VERSION = 2;
 const ALLOWED_PROFILES = new Set(["fast", "standard", "accurate"]);
 const ALLOWED_SHORTCUTS = new Map([
   ["CommandOrControl+Shift+Space", "Ctrl+Shift+Espaço"],
@@ -23,6 +29,9 @@ const DEFAULT_SETTINGS = Object.freeze({
   autoPaste: true,
   restoreClipboard: true,
   maxRecordingSeconds: 120,
+  revisionMode: "literal",
+  revisionModel: DEFAULT_MODEL,
+  revisionTimeoutMs: DEFAULT_TIMEOUT_MS,
   launchAtLogin: false,
   startMinimized: false,
 });
@@ -74,6 +83,23 @@ function normalizeSettings(value = {}) {
         ? value.restoreClipboard
         : DEFAULT_SETTINGS.restoreClipboard,
     maxRecordingSeconds,
+    revisionMode: REVISION_MODES.has(value.revisionMode)
+      ? value.revisionMode
+      : DEFAULT_SETTINGS.revisionMode,
+    revisionModel: normalizeModel(
+      value.revisionModel,
+      DEFAULT_SETTINGS.revisionModel,
+    ),
+    revisionTimeoutMs: Math.round(
+      Math.max(
+        3000,
+        Math.min(
+          60000,
+          Number(value.revisionTimeoutMs) ||
+            DEFAULT_SETTINGS.revisionTimeoutMs,
+        ),
+      ),
+    ),
     launchAtLogin:
       typeof value.launchAtLogin === "boolean"
         ? value.launchAtLogin
@@ -94,6 +120,9 @@ function publicSettings(settings) {
     allowedShortcuts: [...ALLOWED_SHORTCUTS.entries()].map(
       ([value, label]) => ({ value, label }),
     ),
+    allowedRevisionModes: [...REVISION_MODES.entries()].map(
+      ([value, label]) => ({ value, label }),
+    ),
   };
 }
 
@@ -108,7 +137,11 @@ class SettingsStore {
   async load() {
     try {
       const raw = await readFile(this.filePath, "utf8");
-      this.value = normalizeSettings(JSON.parse(raw));
+      const parsed = JSON.parse(raw);
+      this.value = normalizeSettings(parsed);
+      if (parsed.version !== SETTINGS_VERSION) {
+        await this.writeAtomic(this.value);
+      }
     } catch (error) {
       if (error.code !== "ENOENT") {
         await this.backupInvalidFile().catch(() => {});
@@ -165,4 +198,3 @@ module.exports = {
   normalizeSettings,
   publicSettings,
 };
-

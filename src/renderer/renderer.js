@@ -19,6 +19,13 @@ const shortcutDescription = document.querySelector(
 const microphoneSelect = document.querySelector("#microphoneSelect");
 const shortcutSelect = document.querySelector("#shortcutSelect");
 const maxDurationSelect = document.querySelector("#maxDurationSelect");
+const revisionModeSelect = document.querySelector(
+  "#revisionModeSelect",
+);
+const revisionModelSelect = document.querySelector(
+  "#revisionModelSelect",
+);
+const ollamaStatus = document.querySelector("#ollamaStatus");
 const autoPasteInput = document.querySelector("#autoPasteInput");
 const restoreClipboardInput = document.querySelector(
   "#restoreClipboardInput",
@@ -38,6 +45,8 @@ const settingsController = createSettingsController({
   microphoneSelect,
   shortcutSelect,
   maxDurationSelect,
+  revisionModeSelect,
+  revisionModelSelect,
   autoPasteInput,
   restoreClipboardInput,
   launchAtLoginInput,
@@ -45,6 +54,7 @@ const settingsController = createSettingsController({
   shortcutKey,
   shortcutStatus,
   settingsSaveStatus,
+  ollamaStatus,
 });
 
 let audioContext;
@@ -267,20 +277,30 @@ async function stopAndTranscribe(source = recordingSource) {
       audio: wav,
       profile: profileSelect.value,
       vocabulary,
+      revisionMode: revisionModeSelect.value,
+      revisionModel: revisionModelSelect.value,
     });
     resultText.value = result.text;
     copyButton.disabled = false;
+    const revisionSummary = result.revision?.applied
+      ? `${result.revision.mode} por ${result.revision.model}`
+      : result.revision?.fallback
+        ? "revisão indisponível; original mantido"
+        : "modo literal";
     resultMeta.textContent =
       `${result.durationSeconds.toFixed(1)} s de áudio · ` +
-      `${(result.elapsedMs / 1000).toFixed(1)} s para transcrever · ` +
+      `${(result.totalElapsedMs / 1000).toFixed(1)} s total · ` +
+      `${revisionSummary} · ` +
       (result.autoPasted
         ? "inserido no aplicativo ativo"
         : "copiado para o clipboard");
     setStatus(
       "success",
-      result.autoPasted
-        ? "Texto inserido no aplicativo ativo."
-        : "Transcrição concluída e copiada.",
+      result.revision?.fallback
+        ? "Revisão indisponível; texto original mantido."
+        : result.autoPasted
+          ? "Texto inserido no aplicativo ativo."
+          : "Transcrição concluída e copiada.",
     );
     window.localFlow.reportDictationEvent({
       type: "completed",
@@ -352,6 +372,13 @@ window.localFlow.onDictationCommand(async (command) => {
   }
 });
 
+window.localFlow.onTranscriptionProgress((progress) => {
+  if (state !== "processing") return;
+  if (progress?.stage === "revising") {
+    setStatus("processing", "Revisando com o Ollama local…");
+  }
+});
+
 async function initialize() {
   try {
     const runtime = await window.localFlow.inspectRuntime();
@@ -371,7 +398,10 @@ async function initialize() {
       if (firstAvailable) profileSelect.value = firstAvailable.value;
     }
 
-    await settingsController.initialize(runtime.settings);
+    await settingsController.initialize(
+      runtime.settings,
+      runtime.revision,
+    );
     if (
       new URLSearchParams(window.location.search).get(
         "settingsPreview",

@@ -4,6 +4,8 @@ export function createSettingsController({
   microphoneSelect,
   shortcutSelect,
   maxDurationSelect,
+  revisionModeSelect,
+  revisionModelSelect,
   autoPasteInput,
   restoreClipboardInput,
   launchAtLoginInput,
@@ -11,6 +13,7 @@ export function createSettingsController({
   shortcutKey,
   shortcutStatus,
   settingsSaveStatus,
+  ollamaStatus,
 }) {
   const controls = [
     profileSelect,
@@ -18,6 +21,8 @@ export function createSettingsController({
     microphoneSelect,
     shortcutSelect,
     maxDurationSelect,
+    revisionModeSelect,
+    revisionModelSelect,
     autoPasteInput,
     restoreClipboardInput,
     launchAtLoginInput,
@@ -26,6 +31,8 @@ export function createSettingsController({
   let current;
   let ready = false;
   let saveTimer;
+  let busy = false;
+  let revisionAvailable = false;
 
   function readForm() {
     return {
@@ -37,6 +44,8 @@ export function createSettingsController({
       microphoneId: microphoneSelect.value,
       shortcut: shortcutSelect.value,
       maxRecordingSeconds: Number(maxDurationSelect.value),
+      revisionMode: revisionModeSelect.value,
+      revisionModel: revisionModelSelect.value,
       autoPaste: autoPasteInput.checked,
       restoreClipboard: restoreClipboardInput.checked,
       launchAtLogin: launchAtLoginInput.checked,
@@ -58,11 +67,50 @@ export function createSettingsController({
     );
     shortcutSelect.value = settings.shortcut;
     maxDurationSelect.value = String(settings.maxRecordingSeconds);
+    revisionModeSelect.replaceChildren(
+      ...settings.allowedRevisionModes.map((item) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.label;
+        return option;
+      }),
+    );
+    revisionModeSelect.value = settings.revisionMode;
     autoPasteInput.checked = settings.autoPaste;
     restoreClipboardInput.checked = settings.restoreClipboard;
     launchAtLoginInput.checked = settings.launchAtLogin;
     startMinimizedInput.checked = settings.startMinimized;
     shortcutKey.textContent = settings.shortcutDisplay;
+    syncRevisionControls();
+  }
+
+  function configureRevision(revision, selectedModel) {
+    revisionAvailable = Boolean(revision?.available);
+    const models = [...new Set([
+      selectedModel,
+      ...(revision?.models || []),
+    ].filter(Boolean))];
+    revisionModelSelect.replaceChildren(
+      ...models.map((model) => {
+        const option = document.createElement("option");
+        option.value = model;
+        option.textContent = model;
+        return option;
+      }),
+    );
+    revisionModelSelect.value = selectedModel;
+    ollamaStatus.classList.toggle("error", !revisionAvailable);
+    ollamaStatus.lastElementChild.textContent = revisionAvailable
+      ? `Ollama local · ${revision.models.length} modelo(s)`
+      : "Ollama offline · fallback literal ativo";
+    syncRevisionControls();
+  }
+
+  function syncRevisionControls() {
+    revisionModelSelect.disabled =
+      busy ||
+      !revisionAvailable ||
+      revisionModeSelect.value === "literal";
   }
 
   async function refreshMicrophones() {
@@ -123,6 +171,7 @@ export function createSettingsController({
       scheduleSave,
     );
   }
+  revisionModeSelect.addEventListener("change", syncRevisionControls);
   navigator.mediaDevices?.addEventListener(
     "devicechange",
     refreshMicrophones,
@@ -132,13 +181,16 @@ export function createSettingsController({
     get() {
       return current;
     },
-    async initialize(settings) {
+    async initialize(settings, revision) {
       apply(settings);
+      configureRevision(revision, settings.revisionModel);
       await refreshMicrophones();
       ready = true;
     },
     setDisabled(disabled) {
+      busy = disabled;
       for (const control of controls) control.disabled = disabled;
+      syncRevisionControls();
     },
   };
 }

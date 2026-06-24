@@ -14,44 +14,37 @@ const { ClipboardService } = require("./services/clipboard-service.cjs");
 const { cleanOldEntries } = require("./services/housekeeping.cjs");
 const { LoginItemService } = require("./services/login-item-service.cjs");
 const { PrivacyLogger } = require("./services/privacy-logger.cjs");
+const { RevisionService } = require("./services/revision-service.cjs");
+const { detectRunMode } = require("./services/run-mode.cjs");
 const { SettingsStore } = require("./services/settings-store.cjs");
-const { TestHarness } = require("./services/test-harness.cjs");
+const {
+  TestHarness,
+  runEndToEndTest,
+  runRevisionTest,
+} = require("./services/test-harness.cjs");
+const { TranscriptionPipeline } = require("./services/transcription-pipeline.cjs");
 const { WindowManager } = require("./services/window-manager.cjs");
 const { ToggleDictationController } = require("./shortcut-controller.cjs");
 const { WindowsBridge } = require("./windows-bridge.cjs");
-const {
-  inspectRuntime,
-  transcribeWav,
-} = require("./whisper-service.cjs");
+const { inspectRuntime, transcribeWav } = require("./whisper-service.cjs");
 
 const projectRoot = path.resolve(__dirname, "..", "..");
 const startupStartedAt = Date.now();
-const singleInstanceTestRun =
-  process.env.LOCAL_FLOW_SINGLE_INSTANCE_TEST === "1";
-const settingsTestRun =
-  Boolean(process.env.LOCAL_FLOW_SETTINGS_TEST_WRITE) ||
-  Boolean(process.env.LOCAL_FLOW_SETTINGS_TEST_EXPECT);
-const automatedRun =
-  process.env.LOCAL_FLOW_SMOKE_TEST === "1" ||
-  Boolean(process.env.LOCAL_FLOW_CAPTURE_PATH) ||
-  Boolean(process.env.LOCAL_FLOW_CAPTURE_CAPSULE_PATH) ||
-  Boolean(process.env.LOCAL_FLOW_E2E_AUDIO) ||
-  process.env.LOCAL_FLOW_MIC_SELF_TEST === "1" ||
-  process.env.LOCAL_FLOW_TRAY_TEST === "1" ||
-  process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1" ||
-  process.env.LOCAL_FLOW_SHORTCUT_TEST === "1" ||
-  Boolean(process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE) ||
-  Boolean(process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO) ||
-  settingsTestRun ||
-  process.env.LOCAL_FLOW_METRICS_TEST === "1";
-const persistentWindowRun =
-  !automatedRun || process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1";
+const {
+  automatedRun,
+  e2eTestRun,
+  persistentWindowRun,
+  revisionTestRun,
+  settingsTestRun,
+  singleInstanceTestRun,
+} = detectRunMode();
 
 let settingsStore;
 let logger;
 let windowsBridge;
 let clipboardService;
 let loginItemService;
+let revisionService, transcriptionPipeline;
 let windowManager;
 let testHarness;
 let shortcutController;
@@ -64,7 +57,9 @@ let activeProfile = "standard";
 if (process.env.LOCAL_FLOW_USER_DATA) {
   app.setPath("userData", path.resolve(process.env.LOCAL_FLOW_USER_DATA));
 }
-if (singleInstanceTestRun) app.disableHardwareAcceleration();
+if (singleInstanceTestRun || revisionTestRun || e2eTestRun) {
+  app.disableHardwareAcceleration();
+}
 app.setPath(
   "crashDumps",
   path.join(app.getPath("userData"), "crashes"),
@@ -312,6 +307,35 @@ app.whenReady().then(async () => {
     console.log("LOCAL_FLOW_SINGLE_INSTANCE_PRIMARY_READY");
     return;
   }
+  revisionService = new RevisionService({
+    endpoint: process.env.LOCAL_FLOW_REVISION_ENDPOINT,
+    defaultModel: settings.revisionModel,
+    timeoutMs: settings.revisionTimeoutMs,
+  });
+  transcriptionPipeline = new TranscriptionPipeline({
+    projectRoot,
+    transcribeWav,
+    revisionService,
+  });
+  if (e2eTestRun) {
+    await runEndToEndTest({
+      app,
+      clipboard,
+      audioPath: process.env.LOCAL_FLOW_E2E_AUDIO,
+      transcriptionPipeline,
+    });
+    return;
+  }
+  if (revisionTestRun) {
+    await runRevisionTest({
+      app,
+      audioPath: process.env.LOCAL_FLOW_REVISION_TEST_AUDIO,
+      transcriptionPipeline,
+      mode: process.env.LOCAL_FLOW_E2E_REVISION_MODE,
+      model: process.env.LOCAL_FLOW_E2E_REVISION_MODEL,
+    });
+    return;
+  }
 
   windowsBridge = new WindowsBridge({
     scriptPath: path.join(
@@ -374,7 +398,7 @@ app.whenReady().then(async () => {
     clipboard,
     clipboardService,
     projectRoot,
-    transcribeWav,
+    transcriptionPipeline,
     windowManager,
     windowsBridge,
   });
@@ -443,19 +467,28 @@ process.on("unhandledRejection", (error) => {
   );
 });
 
-ipcMain.handle("runtime:inspect", async () => ({
-  ...(await inspectRuntime(projectRoot)),
-  shortcut: {
-    accelerator: activeShortcut,
-    display: formatShortcut(activeShortcut),
-    mode: "toggle",
-    registered: shortcutRegistered,
-    error: shortcutRegistrationError,
-  },
-  settings: settingsStore.getPublic(),
-  loginItem:
-    automatedRun || singleInstanceTestRun ? null : loginItemService.get(),
-}));
+ipcMain.handle("runtime:inspect", async () => {
+  const [whisper, revision] = await Promise.all([
+    inspectRuntime(projectRoot),
+    revisionService.inspect(),
+  ]);
+  return {
+    ...whisper,
+    revision,
+    shortcut: {
+      accelerator: activeShortcut,
+      display: formatShortcut(activeShortcut),
+      mode: "toggle",
+      registered: shortcutRegistered,
+      error: shortcutRegistrationError,
+    },
+    settings: settingsStore.getPublic(),
+    loginItem:
+      automatedRun || singleInstanceTestRun
+        ? null
+        : loginItemService.get(),
+  };
+});
 
 ipcMain.handle("transcription:run", async (_event, payload) => {
   if (transcriptionRunning) {
@@ -472,12 +505,17 @@ ipcMain.handle("transcription:run", async (_event, payload) => {
     const vocabulary = Array.isArray(payload?.vocabulary)
       ? payload.vocabulary
       : settings.vocabulary;
-    const result = await transcribeWav({
-      projectRoot,
+    const result = await transcriptionPipeline.run({
       wavBuffer: Buffer.from(payload.audio),
       profile,
       vocabulary,
       threads: 24,
+      revisionMode: payload?.revisionMode || settings.revisionMode,
+      revisionModel: payload?.revisionModel || settings.revisionModel,
+      revisionTimeoutMs: settings.revisionTimeoutMs,
+      onProgress: (progress) => {
+        _event.sender.send("transcription:progress", progress);
+      },
     });
     const insertion = shortcutTarget
       ? await clipboardService.insert(
@@ -501,6 +539,11 @@ ipcMain.handle("transcription:run", async (_event, payload) => {
       autoPasted: insertion.autoPasted,
       clipboardRestored: insertion.clipboardRestored,
       fallbackReason: insertion.reason,
+      revisionMode: result.revision.mode,
+      revisionApplied: result.revision.applied,
+      revisionFallback: result.revision.fallback,
+      revisionReason: result.revision.reason,
+      revisionElapsedMs: result.revision.elapsedMs,
     });
     return {
       ...result,

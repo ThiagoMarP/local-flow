@@ -305,6 +305,40 @@ textarea:focus {
   box-shadow: none;
 }
 
+.local-engine-status {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  align-self: end;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #5de0a51f;
+  border-radius: 13px;
+  background: #0b1715a6;
+  color: #7fe2b2;
+  font-size: 11px;
+}
+
+.local-engine-status .status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #61dfa2;
+  box-shadow: 0 0 10px #61dfa280;
+}
+
+.local-engine-status.error {
+  border-color: #ff82971f;
+  background: #1a0d12a6;
+  color: #ff91a3;
+}
+
+.local-engine-status.error .status-dot {
+  background: #ff8297;
+  box-shadow: 0 0 10px #ff829766;
+}
+
 .toggle-list {
   grid-column: 1 / -1;
   display: grid;

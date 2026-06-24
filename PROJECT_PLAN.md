@@ -25,7 +25,7 @@ Criar um aplicativo Windows de ditado local, sem limite de palavras, com:
 | 3. Aplicativo desktop | Concluída | Interface, cápsula e bandeja do sistema |
 | 4. Integração com Windows | Concluída | Atalho e inserção automática |
 | 5. Estabilidade | Concluída | Configurações, privacidade, recuperação e otimização |
-| 6. Revisão inteligente | Pendente | Modos de limpeza pelo Ollama |
+| 6. Revisão inteligente | Concluída | Modos literal, limpo e inteligente com fallback |
 | 7. Personalização | Pendente | Dicionário, snippets e perfis |
 | 8. Distribuição | Pendente | Instalador Windows testado |
 
@@ -136,6 +136,15 @@ Adicionar configurações, inicialização com Windows, logs sem conteúdo sens�
 ## Fase 6 — Revisão inteligente
 
 Adicionar modos literal, limpo e inteligente usando Ollama, sempre com fallback para a transcrição original.
+
+### Resultado
+
+- `qwen2.5:3b` definido como modelo padrão de revisão.
+- `qwen2.5:7b` disponível como alternativa instalada.
+- Ollama permanece opcional; literal é o padrão.
+- Respostas inseguras, indisponibilidade e timeout preservam o
+  resultado original do Whisper.
+- Interface mostra modo, modelo e disponibilidade local.
 
 ## Fase 7 — Personalização
 

@@ -2,12 +2,26 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("localFlow", {
   inspectRuntime: () => ipcRenderer.invoke("runtime:inspect"),
-  transcribe: ({ audio, profile, vocabulary }) =>
+  transcribe: ({
+    audio,
+    profile,
+    vocabulary,
+    revisionMode,
+    revisionModel,
+  }) =>
     ipcRenderer.invoke("transcription:run", {
       audio,
       profile,
       vocabulary,
+      revisionMode,
+      revisionModel,
     }),
+  onTranscriptionProgress: (listener) => {
+    const handler = (_event, progress) => listener(progress);
+    ipcRenderer.on("transcription:progress", handler);
+    return () =>
+      ipcRenderer.removeListener("transcription:progress", handler);
+  },
   copyText: (text) => ipcRenderer.invoke("clipboard:write", text),
   reportSelfTest: (result) => ipcRenderer.invoke("selftest:report", result),
   updateUiState: (state) => ipcRenderer.send("ui:update-state", state),

@@ -5,9 +5,13 @@ const sample =
   process.argv[2] ||
   path.join(process.cwd(), "benchmarks", "samples", "05-lista.wav");
 const output = await runElectron({
+  electronArgs: [
+    "--disable-gpu",
+    "--disable-software-rasterizer",
+    "--in-process-gpu",
+  ],
   env: { LOCAL_FLOW_E2E_AUDIO: sample },
   expectedOutput: "LOCAL_FLOW_E2E_OK=",
   timeoutMs: 60000,
 });
 console.log(output.match(/LOCAL_FLOW_E2E_OK=.*$/m)?.[0] || output);
-

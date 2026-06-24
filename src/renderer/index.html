@@ -17,7 +17,7 @@
     <main class="shell">
       <header class="header">
         <div>
-          <p class="eyebrow">Fase 4 · ditado global</p>
+          <p class="eyebrow">Fase 6 · revisão local</p>
           <h1>Local Flow</h1>
           <p class="subtitle">
             Fale em qualquer aplicativo e insira o texto sem sair do contexto.
@@ -25,7 +25,7 @@
         </div>
         <div class="privacy">
           <span class="privacy-dot"></span>
-          Offline
+          Processamento local
         </div>
       </header>
 
@@ -90,7 +90,7 @@
         <summary>
           <span>
             <strong>Configurações</strong>
-            <small>Privacidade, microfone e comportamento</small>
+            <small>Revisão local, privacidade e comportamento</small>
           </span>
           <span class="settings-save-status" id="settingsSaveStatus">
             Salvo localmente
@@ -119,6 +119,27 @@
               <option value="600">10 minutos</option>
             </select>
           </label>
+
+          <label class="field compact">
+            <span>Tratamento do texto</span>
+            <select id="revisionModeSelect">
+              <option value="literal">Literal</option>
+              <option value="clean">Limpo</option>
+              <option value="smart">Inteligente</option>
+            </select>
+          </label>
+
+          <label class="field compact">
+            <span>Modelo de revisão</span>
+            <select id="revisionModelSelect">
+              <option value="qwen2.5:3b">qwen2.5:3b</option>
+            </select>
+          </label>
+
+          <div class="local-engine-status" id="ollamaStatus">
+            <span class="status-dot"></span>
+            <span>Verificando Ollama local…</span>
+          </div>
 
           <div class="toggle-list">
             <label class="toggle-row">
