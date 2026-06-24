@@ -2,6 +2,7 @@ const {
   app,
   BrowserWindow,
   clipboard,
+  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
@@ -11,14 +12,17 @@ const {
 } = require("electron");
 const { mkdir, readFile, writeFile } = require("node:fs/promises");
 const path = require("node:path");
+const { ToggleDictationController } = require("./shortcut-controller.cjs");
 const { calculateCapsuleBounds } = require("./window-layout.cjs");
 const { normalizeUiState } = require("./ui-state.cjs");
+const { WindowsBridge } = require("./windows-bridge.cjs");
 const {
   inspectRuntime,
   transcribeWav,
 } = require("./whisper-service.cjs");
 
 const projectRoot = path.resolve(__dirname, "..", "..");
+const DICTATION_SHORTCUT = "CommandOrControl+Shift+Space";
 const automatedRun =
   process.env.LOCAL_FLOW_SMOKE_TEST === "1" ||
   Boolean(process.env.LOCAL_FLOW_CAPTURE_PATH) ||
@@ -26,7 +30,10 @@ const automatedRun =
   Boolean(process.env.LOCAL_FLOW_E2E_AUDIO) ||
   process.env.LOCAL_FLOW_MIC_SELF_TEST === "1" ||
   process.env.LOCAL_FLOW_TRAY_TEST === "1" ||
-  process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1";
+  process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1" ||
+  process.env.LOCAL_FLOW_SHORTCUT_TEST === "1" ||
+  Boolean(process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE) ||
+  Boolean(process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO);
 const persistentWindowRun =
   !automatedRun || process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1";
 
@@ -42,6 +49,10 @@ let currentUiState = normalizeUiState({
   message: "Pronto",
   profile: activeProfile,
 });
+let windowsBridge;
+let shortcutController;
+let shortcutRegistered = false;
+let shortcutRegistrationError = "";
 
 if (process.env.LOCAL_FLOW_USER_DATA) {
   app.setPath("userData", path.resolve(process.env.LOCAL_FLOW_USER_DATA));
@@ -73,6 +84,7 @@ function createDashboardWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   });
 
@@ -110,6 +122,10 @@ function createDashboardWindow() {
     }
     if (process.env.LOCAL_FLOW_E2E_AUDIO) {
       await runEndToEndTest(process.env.LOCAL_FLOW_E2E_AUDIO);
+      return;
+    }
+    if (process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO) {
+      await runInsertionTest();
       return;
     }
     if (process.env.LOCAL_FLOW_LIFECYCLE_TEST === "1") {
@@ -246,6 +262,12 @@ function rebuildTrayMenu() {
         label: `Perfil: ${profileLabels[activeProfile]}`,
         enabled: false,
       },
+      {
+        label: shortcutRegistered
+          ? "Atalho: Ctrl+Shift+Espaço"
+          : "Atalho global indisponível",
+        enabled: false,
+      },
       { type: "separator" },
       {
         label: "Sair",
@@ -256,6 +278,166 @@ function rebuildTrayMenu() {
       },
     ]),
   );
+}
+
+function snapshotTextClipboard() {
+  const formats = clipboard.availableFormats();
+  const text = clipboard.readText();
+  return {
+    text,
+    canRestore:
+      text.length > 0 || formats.some((format) => /text/i.test(format)),
+  };
+}
+
+async function captureDictationTarget() {
+  const target = await windowsBridge.captureForeground();
+  if (!target) {
+    return {
+      hwnd: null,
+      processId: null,
+      processName: "",
+      title: "",
+      isSelf: false,
+      clipboard: snapshotTextClipboard(),
+    };
+  }
+  return {
+    ...target,
+    isSelf: Number(target.processId) === process.pid,
+    clipboard: snapshotTextClipboard(),
+  };
+}
+
+function createShortcutController() {
+  shortcutController = new ToggleDictationController({
+    captureTarget: captureDictationTarget,
+    onStart: async () => {
+      applyUiState({
+        state: "processing",
+        message: "Abrindo microfone…",
+        profile: activeProfile,
+      });
+      dashboardWindow.webContents.send("dictation:command", {
+        action: "start",
+        source: "shortcut",
+      });
+    },
+    onStop: async () => {
+      dashboardWindow.webContents.send("dictation:command", {
+        action: "stop",
+        source: "shortcut",
+      });
+    },
+  });
+}
+
+function registerDictationShortcut() {
+  shortcutRegistered = globalShortcut.register(
+    DICTATION_SHORTCUT,
+    () => {
+      if (process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE) {
+        const target = path.resolve(
+          process.env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE,
+        );
+        mkdir(path.dirname(target), { recursive: true })
+          .then(() =>
+            writeFile(
+              target,
+              JSON.stringify({
+                triggeredAt: new Date().toISOString(),
+                accelerator: DICTATION_SHORTCUT,
+              }),
+            ),
+          )
+          .then(() => {
+            console.log("LOCAL_FLOW_SHORTCUT_INPUT_TRIGGERED");
+            app.quit();
+          })
+          .catch((error) => {
+            console.error(
+              `LOCAL_FLOW_SHORTCUT_INPUT_ERROR=${error.stack || error.message}`,
+            );
+            app.exit(1);
+          });
+        return;
+      }
+      if (process.env.LOCAL_FLOW_SHORTCUT_TEST === "1") {
+        console.log("LOCAL_FLOW_SHORTCUT_TRIGGERED");
+        setTimeout(() => app.quit(), 100);
+        return;
+      }
+      shortcutController.toggle().catch((error) => {
+        shortcutController.fail();
+        applyUiState({
+          state: "error",
+          message: `Atalho falhou: ${error.message}`,
+          profile: activeProfile,
+        });
+      });
+    },
+  );
+  if (!shortcutRegistered) {
+    shortcutRegistrationError =
+      "Ctrl+Shift+Espaço já está sendo usado por outro aplicativo.";
+  }
+  console.log(
+    `LOCAL_FLOW_SHORTCUT_READY=${JSON.stringify({
+      accelerator: DICTATION_SHORTCUT,
+      registered: shortcutRegistered,
+    })}`,
+  );
+  rebuildTrayMenu();
+
+  if (
+    shortcutRegistered &&
+    process.env.LOCAL_FLOW_SHORTCUT_TEST === "1"
+  ) {
+    setTimeout(() => app.quit(), 300);
+  }
+}
+
+async function pasteShortcutResult(text, target) {
+  clipboard.writeText(text);
+  if (!target?.hwnd || target.isSelf) {
+    return {
+      autoPasted: false,
+      clipboardRestored: false,
+      reason: target?.isSelf ? "local-flow-active" : "target-unavailable",
+    };
+  }
+
+  let pasteResult;
+  try {
+    pasteResult = await windowsBridge.pasteTo(target.hwnd);
+  } catch (error) {
+    return {
+      autoPasted: false,
+      clipboardRestored: false,
+      reason: "windows-helper-failed",
+      diagnostics: { error: error.message },
+    };
+  }
+  if (!pasteResult?.pasted) {
+    return {
+      autoPasted: false,
+      clipboardRestored: false,
+      reason: "focus-or-paste-failed",
+      diagnostics: pasteResult || null,
+    };
+  }
+
+  let clipboardRestored = false;
+  if (target.clipboard?.canRestore) {
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    clipboard.writeText(target.clipboard.text);
+    clipboardRestored = true;
+  }
+  return {
+    autoPasted: true,
+    clipboardRestored,
+    reason: null,
+  };
 }
 
 function createTray() {
@@ -353,6 +535,63 @@ async function runEndToEndTest(audioPath) {
   }
 }
 
+async function runInsertionTest() {
+  try {
+    const delayMs = Number(
+      process.env.LOCAL_FLOW_INSERTION_TEST_DELAY_MS || 0,
+    );
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    const target = await windowsBridge.findByTitle(
+      process.env.LOCAL_FLOW_INSERTION_TEST_TITLE,
+    );
+    if (!target) {
+      throw new Error("A janela de teste de inserção não foi encontrada.");
+    }
+    clipboard.writeText("LOCAL_FLOW_CLIPBOARD_ORIGINAL");
+    const dictationTarget = {
+      ...target,
+      isSelf: false,
+      clipboard: snapshotTextClipboard(),
+    };
+    const wavBuffer = await readFile(
+      path.resolve(process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO),
+    );
+    const result = await transcribeWav({
+      projectRoot,
+      wavBuffer,
+      profile: "fast",
+      vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
+      threads: 24,
+    });
+    const insertion = await pasteShortcutResult(
+      result.text,
+      dictationTarget,
+    );
+    if (!insertion.autoPasted) {
+      throw new Error(
+        `A inserção falhou: ${insertion.reason} ${JSON.stringify(insertion.diagnostics)}`,
+      );
+    }
+    if (clipboard.readText() !== "LOCAL_FLOW_CLIPBOARD_ORIGINAL") {
+      throw new Error("O clipboard textual não foi restaurado.");
+    }
+    console.log(
+      `LOCAL_FLOW_INSERTION_OK=${JSON.stringify({
+        text: result.text,
+        ...insertion,
+      })}`,
+    );
+    app.quit();
+  } catch (error) {
+    console.error(
+      `LOCAL_FLOW_INSERTION_ERROR=${error.stack || error.message}`,
+    );
+    app.exit(1);
+  }
+}
+
 async function runLifecycleTest() {
   try {
     dashboardWindow.close();
@@ -425,9 +664,20 @@ function configureMicrophonePermission() {
 }
 
 app.whenReady().then(() => {
+  windowsBridge = new WindowsBridge({
+    scriptPath: path.join(
+      projectRoot,
+      "native",
+      "windows",
+      "foreground-helper.ps1",
+    ),
+  });
+  windowsBridge.start();
   createDashboardWindow();
   createCapsuleWindow();
   configureMicrophonePermission();
+  createShortcutController();
+  registerDictationShortcut();
   if (
     !automatedRun ||
     process.env.LOCAL_FLOW_TRAY_TEST === "1" ||
@@ -447,17 +697,35 @@ app.on("before-quit", () => {
   isQuitting = true;
 });
 
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+  windowsBridge?.dispose();
+});
+
 app.on("window-all-closed", () => {
   if (automatedRun) app.quit();
 });
 
-ipcMain.handle("runtime:inspect", async () => inspectRuntime(projectRoot));
+ipcMain.handle("runtime:inspect", async () => ({
+  ...(await inspectRuntime(projectRoot)),
+  shortcut: {
+    accelerator: DICTATION_SHORTCUT,
+    display: "Ctrl+Shift+Espaço",
+    mode: "toggle",
+    registered: shortcutRegistered,
+    error: shortcutRegistrationError,
+  },
+}));
 
 ipcMain.handle("transcription:run", async (_event, payload) => {
   if (transcriptionRunning) {
     throw new Error("Já existe uma transcrição em andamento.");
   }
   transcriptionRunning = true;
+  const shortcutTarget =
+    shortcutController?.state === "processing"
+      ? shortcutController.target
+      : null;
   try {
     const result = await transcribeWav({
       projectRoot,
@@ -466,8 +734,25 @@ ipcMain.handle("transcription:run", async (_event, payload) => {
       vocabulary: payload.vocabulary,
       threads: 24,
     });
-    clipboard.writeText(result.text);
-    return { ...result, copiedToClipboard: true };
+    const insertion = shortcutTarget
+      ? await pasteShortcutResult(result.text, shortcutTarget)
+      : (() => {
+          clipboard.writeText(result.text);
+          return {
+            autoPasted: false,
+            clipboardRestored: false,
+            reason: "manual-recording",
+          };
+        })();
+    shortcutController?.complete();
+    return {
+      ...result,
+      copiedToClipboard: true,
+      ...insertion,
+    };
+  } catch (error) {
+    shortcutController?.fail();
+    throw error;
   } finally {
     transcriptionRunning = false;
   }
@@ -489,6 +774,12 @@ ipcMain.handle("selftest:report", (_event, result) => {
 
 ipcMain.on("ui:update-state", (_event, payload) => {
   applyUiState(payload);
+});
+
+ipcMain.on("dictation:event", (_event, payload) => {
+  if (payload?.type === "error") {
+    shortcutController?.fail();
+  }
 });
 
 ipcMain.handle("ui:get-state", () => currentUiState);

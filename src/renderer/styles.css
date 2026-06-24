@@ -207,6 +207,42 @@ textarea:focus {
   padding: 22px;
 }
 
+.shortcut-panel {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 17px 20px;
+}
+
+.shortcut-description {
+  margin: 0;
+  color: #8791a5;
+  font-size: 13px;
+}
+
+.shortcut-key {
+  padding: 9px 13px;
+  border: 1px solid #ffffff17;
+  border-bottom-color: #ffffff29;
+  border-radius: 10px;
+  background: #0a0e15;
+  box-shadow: inset 0 -2px #0000004d;
+  color: #e8ecf5;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.shortcut-status {
+  color: #62dda0;
+  font-size: 11px;
+}
+
+.shortcut-status.error {
+  color: #ff8297;
+}
+
 .tray-panel {
   display: flex;
   justify-content: space-between;
@@ -272,8 +308,12 @@ textarea {
     flex-direction: column;
   }
 
+  .shortcut-panel {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
   .demo-controls {
     justify-content: flex-start;
   }
 }
-

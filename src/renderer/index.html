@@ -17,10 +17,10 @@
     <main class="shell">
       <header class="header">
         <div>
-          <p class="eyebrow">Fase 3 · aplicativo desktop</p>
+          <p class="eyebrow">Fase 4 · ditado global</p>
           <h1>Local Flow</h1>
           <p class="subtitle">
-            Ditado local com painel persistente, cápsula flutuante e bandeja.
+            Fale em qualquer aplicativo e insira o texto sem sair do contexto.
           </p>
         </div>
         <div class="privacy">
@@ -71,6 +71,19 @@
             placeholder="Termos separados por vírgula"
           />
         </label>
+      </section>
+
+      <section class="panel shortcut-panel">
+        <div class="shortcut-copy">
+          <p class="label">Atalho global</p>
+          <p class="shortcut-description" id="shortcutDescription">
+            Pressione uma vez para iniciar e novamente para transcrever.
+          </p>
+        </div>
+        <div class="shortcut-key" id="shortcutKey">
+          Ctrl + Shift + Espaço
+        </div>
+        <span class="shortcut-status" id="shortcutStatus">Verificando…</span>
       </section>
 
       <section class="panel result-panel">

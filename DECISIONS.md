@@ -53,3 +53,11 @@ A cápsula não recebe foco nem eventos do mouse. Sua função é representar o 
 ## 2026-06-23 — Estado centralizado no processo principal
 
 O painel publica um contrato restrito de estado. O processo principal normaliza esse conteúdo e o encaminha para a cápsula. Isso permite que o atalho global da Fase 4 reutilize a mesma interface sem acoplamento direto entre janelas.
+
+## 2026-06-23 — Atalho em modo alternar
+
+O atalho inicial será `Ctrl+Shift+Espaço`: um toque inicia e o segundo encerra. `Ctrl+Alt+Espaço` foi testado, mas já estava ocupado no Windows. O modo pressionar/soltar exigirá hook de teclado nativo e fica como evolução.
+
+## 2026-06-23 — Auxiliar Windows persistente
+
+Captura de janela, retorno de foco e colagem são executados por um processo PowerShell local persistente com chamadas diretas ao `user32.dll`. Isso evita dependências nativas externas e reduz a latência de inicialização.

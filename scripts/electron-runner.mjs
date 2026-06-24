@@ -7,6 +7,7 @@ export async function runElectron({
   env = {},
   expectedOutput,
   timeoutMs = 30000,
+  onSpawn,
 }) {
   const electronPath = path.join(
     process.cwd(),
@@ -32,6 +33,10 @@ export async function runElectron({
         ...env,
       },
       windowsHide: true,
+    });
+    Promise.resolve(onSpawn?.(child)).catch((error) => {
+      child.kill();
+      reject(error);
     });
     let output = "";
     child.stdout.on("data", (chunk) => {

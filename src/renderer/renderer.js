@@ -10,6 +10,11 @@ const timerElement = document.querySelector("#timer");
 const meterFill = document.querySelector("#meterFill");
 const resultText = document.querySelector("#resultText");
 const resultMeta = document.querySelector("#resultMeta");
+const shortcutKey = document.querySelector("#shortcutKey");
+const shortcutStatus = document.querySelector("#shortcutStatus");
+const shortcutDescription = document.querySelector(
+  "#shortcutDescription",
+);
 
 let audioContext;
 let sourceNode;
@@ -21,6 +26,8 @@ let recordingStartedAt = 0;
 let timerInterval;
 let state = "booting";
 let lastLevelPublish = 0;
+let recordingSource = "manual";
+let pendingShortcutStop = false;
 
 function capsuleState(nextState) {
   if (nextState === "requesting") return "processing";
@@ -77,8 +84,9 @@ function buildWav() {
   return joinAndEncode(chunks, audioContext.sampleRate, 16000);
 }
 
-async function startRecording() {
+async function startRecording(source = "manual") {
   try {
+    recordingSource = source;
     setStatus("requesting", "Solicitando acesso ao microfone…");
     microphoneStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -125,12 +133,25 @@ async function startRecording() {
     timerElement.textContent = "00:00";
     timerInterval = window.setInterval(updateTimer, 250);
     setStatus("recording", "Ouvindo…");
+    window.localFlow.reportDictationEvent({
+      type: "started",
+      source: recordingSource,
+    });
+    if (pendingShortcutStop) {
+      pendingShortcutStop = false;
+      await stopAndTranscribe("shortcut");
+    }
   } catch (error) {
     await stopAudioGraph();
     setStatus(
       "error",
       `Não foi possível acessar o microfone: ${error.message}`,
     );
+    window.localFlow.reportDictationEvent({
+      type: "error",
+      source: recordingSource,
+      message: error.message,
+    });
   }
 }
 
@@ -146,7 +167,7 @@ async function stopAudioGraph() {
   meterFill.style.width = "0";
 }
 
-async function stopAndTranscribe() {
+async function stopAndTranscribe(source = recordingSource) {
   if (state !== "recording") return;
   setStatus("processing", "Preparando o áudio…");
   const wav = buildWav();
@@ -173,17 +194,36 @@ async function stopAndTranscribe() {
     resultMeta.textContent =
       `${result.durationSeconds.toFixed(1)} s de áudio · ` +
       `${(result.elapsedMs / 1000).toFixed(1)} s para transcrever · ` +
-      "copiado para o clipboard";
-    setStatus("success", "Transcrição concluída e copiada.");
+      (result.autoPasted
+        ? "inserido no aplicativo ativo"
+        : "copiado para o clipboard");
+    setStatus(
+      "success",
+      result.autoPasted
+        ? "Texto inserido no aplicativo ativo."
+        : "Transcrição concluída e copiada.",
+    );
+    window.localFlow.reportDictationEvent({
+      type: "completed",
+      source,
+      autoPasted: result.autoPasted,
+    });
   } catch (error) {
     setStatus("error", `Falha na transcrição: ${error.message}`);
+    window.localFlow.reportDictationEvent({
+      type: "error",
+      source,
+      message: error.message,
+    });
   } finally {
     chunks = [];
   }
 }
 
-recordButton.addEventListener("click", startRecording);
-stopButton.addEventListener("click", stopAndTranscribe);
+recordButton.addEventListener("click", () => startRecording("manual"));
+stopButton.addEventListener("click", () =>
+  stopAndTranscribe(recordingSource),
+);
 copyButton.addEventListener("click", async () => {
   if (!resultText.value) return;
   await window.localFlow.copyText(resultText.value);
@@ -213,6 +253,22 @@ window.addEventListener("beforeunload", () => {
   microphoneStream?.getTracks().forEach((track) => track.stop());
 });
 
+window.localFlow.onDictationCommand(async (command) => {
+  if (command?.action === "start") {
+    if (["idle", "success", "error"].includes(state)) {
+      await startRecording("shortcut");
+    }
+    return;
+  }
+  if (command?.action === "stop" && state === "recording") {
+    await stopAndTranscribe("shortcut");
+    return;
+  }
+  if (command?.action === "stop" && state === "requesting") {
+    pendingShortcutStop = true;
+  }
+});
+
 async function initialize() {
   try {
     const runtime = await window.localFlow.inspectRuntime();
@@ -230,6 +286,22 @@ async function initialize() {
         (option) => !option.disabled,
       );
       if (firstAvailable) profileSelect.value = firstAvailable.value;
+    }
+
+    shortcutKey.textContent = runtime.shortcut.display;
+    shortcutDescription.textContent =
+      runtime.shortcut.mode === "toggle"
+        ? "Pressione uma vez para iniciar e novamente para transcrever."
+        : "Segure para falar e solte para transcrever.";
+    shortcutStatus.textContent = runtime.shortcut.registered
+      ? "Ativo"
+      : "Indisponível";
+    shortcutStatus.classList.toggle(
+      "error",
+      !runtime.shortcut.registered,
+    );
+    if (runtime.shortcut.error) {
+      shortcutDescription.textContent = runtime.shortcut.error;
     }
 
     setStatus("idle", "Pronto para gravar.");

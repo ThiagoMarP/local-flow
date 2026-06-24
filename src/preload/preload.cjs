@@ -17,6 +17,13 @@ contextBridge.exposeInMainWorld("localFlow", {
     ipcRenderer.on("ui:state", handler);
     return () => ipcRenderer.removeListener("ui:state", handler);
   },
+  onDictationCommand: (listener) => {
+    const handler = (_event, command) => listener(command);
+    ipcRenderer.on("dictation:command", handler);
+    return () => ipcRenderer.removeListener("dictation:command", handler);
+  },
+  reportDictationEvent: (event) =>
+    ipcRenderer.send("dictation:event", event),
   showDashboard: () => ipcRenderer.invoke("app:show-dashboard"),
   hideDashboard: () => ipcRenderer.invoke("app:hide-dashboard"),
 });
