@@ -32,12 +32,16 @@ test("mantém texto no clipboard quando colagem está desativada", async () => {
   assert.equal(clipboard.value(), "novo");
 });
 
-test("restaura clipboard após colagem bem-sucedida", async () => {
+test("restaura clipboard quando o destino confirma recebimento", async () => {
   const clipboard = createClipboard("anterior");
   const service = new ClipboardService({
     clipboard,
     windowsBridge: {
-      pasteTo: async () => ({ pasted: true }),
+      pasteTo: async () => ({
+        pasted: true,
+        focusVerified: true,
+        deliveryVerified: true,
+      }),
     },
     delay: 0,
   });
@@ -53,6 +57,34 @@ test("restaura clipboard após colagem bem-sucedida", async () => {
   assert.equal(result.autoPasted, true);
   assert.equal(result.clipboardRestored, true);
   assert.equal(clipboard.value(), "anterior");
+});
+
+test("mantém transcrição copiável quando envio de Ctrl+V não comprova inserção", async () => {
+  const clipboard = createClipboard("anterior");
+  let pasteArguments;
+  const service = new ClipboardService({
+    clipboard,
+    windowsBridge: {
+      pasteTo: async (...args) => {
+        pasteArguments = args;
+        return {
+          pasted: true,
+          focusVerified: true,
+          deliveryVerified: false,
+        };
+      },
+    },
+    delay: 0,
+  });
+  const result = await service.insert(
+    "novo",
+    { hwnd: "42", focusHwnd: "84", isSelf: false },
+    { autoPaste: true, restoreClipboard: true },
+  );
+  assert.deepEqual(pasteArguments, ["42", "84"]);
+  assert.equal(result.autoPasted, true);
+  assert.equal(result.clipboardRestored, false);
+  assert.equal(clipboard.value(), "novo");
 });
 
 test("preserva transcrição quando auxiliar falha", async () => {
@@ -76,3 +108,21 @@ test("preserva transcrição quando auxiliar falha", async () => {
   assert.equal(clipboard.value(), "novo");
 });
 
+test("não declara colagem quando o auxiliar perdeu o foco do campo", async () => {
+  const clipboard = createClipboard("anterior");
+  const service = new ClipboardService({
+    clipboard,
+    windowsBridge: {
+      pasteTo: async () => ({ pasted: true, focusVerified: false }),
+    },
+    delay: 0,
+  });
+  const result = await service.insert(
+    "novo",
+    { hwnd: "42", focusHwnd: "84", isSelf: false },
+    { autoPaste: true, restoreClipboard: true },
+  );
+  assert.equal(result.autoPasted, false);
+  assert.equal(result.reason, "target-focus-lost");
+  assert.equal(clipboard.value(), "novo");
+});

@@ -3,6 +3,9 @@ const test = require("node:test");
 const {
   extractTranscription,
   getModelPath,
+  runProcess,
+  stripNonSpeech,
+  transcribeWav,
   validateWav,
 } = require("../src/main/whisper-service.cjs");
 
@@ -46,6 +49,16 @@ test("extrai e normaliza segmentos da transcrição", () => {
   assert.equal(text, "Olá mundo.");
 });
 
+test("remove anotações de não-fala alucinadas", () => {
+  assert.equal(
+    stripNonSpeech("Olá [MÚSICA DE FUNDO] mundo"),
+    "Olá mundo",
+  );
+  assert.equal(stripNonSpeech("[BLANK_AUDIO]"), "");
+  assert.equal(stripNonSpeech("♪♪ tudo bem ♪"), "tudo bem");
+  assert.equal(stripNonSpeech("texto normal"), "texto normal");
+});
+
 test("rejeita perfil de modelo não permitido", () => {
   assert.throws(
     () => getModelPath("C:\\projeto", "..\\outro"),
@@ -53,3 +66,22 @@ test("rejeita perfil de modelo não permitido", () => {
   );
 });
 
+test("Whisper não inicia um trabalho previamente cancelado", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    transcribeWav({ wavBuffer: createPcmWav(), signal: controller.signal }),
+    { name: "AbortError", code: "ABORT_ERR" },
+  );
+});
+
+test("cancelar Whisper encerra o subprocesso em andamento", async () => {
+  const controller = new AbortController();
+  const running = runProcess(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000)"],
+    { signal: controller.signal, timeoutMs: 5000 },
+  );
+  setTimeout(() => controller.abort(), 50);
+  await assert.rejects(running, { name: "AbortError", code: "ABORT_ERR" });
+});

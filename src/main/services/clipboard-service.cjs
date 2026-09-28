@@ -28,18 +28,34 @@ class ClipboardService {
 
     let pasteResult;
     try {
-      pasteResult = await this.windowsBridge.pasteTo(target.hwnd);
+      pasteResult = await this.windowsBridge.pasteTo(
+        target.hwnd,
+        target.focusHwnd,
+      );
     } catch (error) {
       return this.fallback("windows-helper-failed", {
         errorCode: error.code || error.name,
       });
     }
-    if (!pasteResult?.pasted) {
-      return this.fallback("focus-or-paste-failed", pasteResult || null);
+    if (!pasteResult?.pasted || pasteResult.focusVerified === false) {
+      return this.fallback(
+        pasteResult?.reason ||
+          (pasteResult?.focusVerified === false
+            ? "target-focus-lost"
+            : "focus-or-paste-failed"),
+        pasteResult || null,
+      );
     }
 
     let clipboardRestored = false;
-    if (settings.restoreClipboard && target.clipboard?.canRestore) {
+    // A verified focus only proves where Ctrl+V was sent. It does not prove
+    // the editor accepted the text, so keep the transcription available for
+    // manual Ctrl+V unless the bridge can verify actual delivery.
+    if (
+      settings.restoreClipboard &&
+      pasteResult.deliveryVerified === true &&
+      target.clipboard?.canRestore
+    ) {
       await new Promise((resolve) => setTimeout(resolve, this.delay));
       this.clipboard.writeText(target.clipboard.text);
       clipboardRestored = true;
@@ -62,4 +78,3 @@ class ClipboardService {
 }
 
 module.exports = { ClipboardService };
-

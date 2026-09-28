@@ -15,12 +15,16 @@ test("redige conteúdo sensível", () => {
       clipboardValue: "segredo",
       profile: "fast",
       nested: { vocabulary: ["nome"] },
+      replacements: [{ from: "zap", to: "WhatsApp" }],
+      snippets: [{ trigger: "assinatura", expansion: "nome" }],
     }),
     {
       text: "[REDACTED]",
       clipboardValue: "[REDACTED]",
       profile: "fast",
       nested: { vocabulary: "[REDACTED]" },
+      replacements: "[REDACTED]",
+      snippets: "[REDACTED]",
     },
   );
 });
@@ -40,4 +44,3 @@ test("log gravado não contém texto ditado", async () => {
   assert.equal(raw.includes("conteúdo privado"), false);
   assert.equal(raw.includes("[REDACTED]"), true);
 });
-

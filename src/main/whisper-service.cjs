@@ -9,6 +9,10 @@ const {
 } = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
+const {
+  createAbortError,
+  throwIfAborted,
+} = require("./services/cancellation.cjs");
 
 const MODEL_FILES = Object.freeze({
   fast: "ggml-small-q5_1.bin",
@@ -16,24 +20,21 @@ const MODEL_FILES = Object.freeze({
   accurate: "ggml-large-v3-turbo-q5_0.bin",
 });
 
-function getRuntimePaths(projectRoot) {
+function getRuntimePaths(projectRoot, overrides = {}) {
   return {
-    whisperCli: path.join(
-      projectRoot,
-      "native",
-      "whisper",
-      "whisper-cli.exe",
-    ),
-    modelsDir: path.join(projectRoot, "models"),
+    whisperCli:
+      overrides.whisperCli ||
+      path.join(projectRoot, "native", "whisper", "whisper-cli.exe"),
+    modelsDir: overrides.modelsDir || path.join(projectRoot, "models"),
   };
 }
 
-function getModelPath(projectRoot, profile) {
+function getModelPath(projectRoot, profile, modelsDir) {
   const file = MODEL_FILES[profile];
   if (!file) {
     throw new Error(`Perfil de modelo inválido: ${profile}`);
   }
-  return path.join(projectRoot, "models", file);
+  return path.join(modelsDir || path.join(projectRoot, "models"), file);
 }
 
 function validateWav(buffer) {
@@ -98,6 +99,18 @@ function validateWav(buffer) {
   };
 }
 
+// Whisper hallucinates non-speech annotations on silence or background noise,
+// e.g. "[MÚSICA DE FUNDO]", "[BLANK_AUDIO]", "[Applause]" or runs of "♪". Drop
+// those so they never reach the user's text.
+function stripNonSpeech(text) {
+  if (typeof text !== "string") return "";
+  return text
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/♪+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function extractTranscription(json) {
   if (typeof json?.text === "string") {
     return json.text.trim();
@@ -112,8 +125,25 @@ function extractTranscription(json) {
     .trim();
 }
 
+// Per-segment view of the transcription, with millisecond offsets. Needs the
+// run to omit -nt (no-timestamps), otherwise whisper collapses everything into
+// one coarse 30s window. Used by the meeting pipeline to interleave speakers.
+function extractSegments(json) {
+  if (!Array.isArray(json?.transcription)) return [];
+  const segments = [];
+  for (const item of json.transcription) {
+    const text = stripNonSpeech(item?.text || item?.texts?.[0] || "");
+    if (!text) continue;
+    const from = Number(item?.offsets?.from) || 0;
+    const to = Number(item?.offsets?.to);
+    segments.push({ from, to: Number.isFinite(to) ? to : from, text });
+  }
+  return segments;
+}
+
 function runProcess(executable, args, options = {}) {
   const timeoutMs = options.timeoutMs ?? 120000;
+  throwIfAborted(options.signal);
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, {
       cwd: options.cwd,
@@ -122,16 +152,29 @@ function runProcess(executable, args, options = {}) {
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let aborted = false;
+    let timedOut = false;
 
-    const timer = setTimeout(() => {
+    const finish = (error, result) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
+      options.signal?.removeEventListener("abort", onAbort);
+      if (error) reject(error);
+      else resolve(result);
+    };
+
+    const onAbort = () => {
+      if (settled) return;
+      aborted = true;
       child.kill();
-      reject(
-        new Error(
-          `A transcrição excedeu o limite de ${Math.round(timeoutMs / 1000)} segundos.`,
-        ),
-      );
+    };
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+
+    const timer = setTimeout(() => {
+      if (settled || aborted) return;
+      timedOut = true;
+      child.kill();
     }, timeoutMs);
 
     child.stdout.on("data", (chunk) => {
@@ -141,30 +184,36 @@ function runProcess(executable, args, options = {}) {
       stderr += chunk.toString();
     });
     child.once("error", (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(error);
+      finish(aborted || options.signal?.aborted ? createAbortError() : error);
     });
     child.once("close", (code) => {
       if (settled) return;
-      settled = true;
-      clearTimeout(timer);
+      if (aborted || options.signal?.aborted) {
+        finish(createAbortError());
+        return;
+      }
+      if (timedOut) {
+        finish(new Error(
+          `A transcrição excedeu o limite de ${Math.round(timeoutMs / 1000)} segundos.`,
+        ));
+        return;
+      }
       if (code !== 0) {
-        reject(
+        finish(
           new Error(
             `O Whisper terminou com código ${code}. ${stderr || stdout}`.trim(),
           ),
         );
         return;
       }
-      resolve({ stdout, stderr });
+      finish(null, { stdout, stderr });
     });
+    if (options.signal?.aborted) onAbort();
   });
 }
 
-async function inspectRuntime(projectRoot) {
-  const { whisperCli, modelsDir } = getRuntimePaths(projectRoot);
+async function inspectRuntime(projectRoot, overrides = {}) {
+  const { whisperCli, modelsDir } = getRuntimePaths(projectRoot, overrides);
   const profiles = {};
   for (const [profile, file] of Object.entries(MODEL_FILES)) {
     try {
@@ -185,34 +234,69 @@ async function inspectRuntime(projectRoot) {
   return {
     whisperAvailable,
     whisperCli,
+    modelsDir,
     profiles,
   };
 }
 
 async function transcribeWav({
   projectRoot,
+  whisperCli: whisperCliOverride,
+  modelsDir: modelsDirOverride,
   wavBuffer,
   profile = "standard",
   language = "pt",
   threads = 24,
   vocabulary = [],
   timeoutMs = 120000,
+  withTimestamps = false,
+  allowEmpty = false,
+  noContext = false,
+  signal,
 }) {
+  throwIfAborted(signal);
   const wavInfo = validateWav(wavBuffer);
-  const { whisperCli } = getRuntimePaths(projectRoot);
-  const modelPath = getModelPath(projectRoot, profile);
-  await access(whisperCli);
-  await access(modelPath);
+  const { whisperCli, modelsDir } = getRuntimePaths(projectRoot, {
+    whisperCli: whisperCliOverride,
+    modelsDir: modelsDirOverride,
+  });
+  const modelPath = getModelPath(projectRoot, profile, modelsDir);
+  try {
+    await access(whisperCli);
+  } catch {
+    throwIfAborted(signal);
+    const error = new Error(
+      "O motor de transcrição (whisper-cli.exe) não foi encontrado. Reinstale o Local Flow.",
+    );
+    error.code = "WHISPER_CLI_MISSING";
+    throw error;
+  }
+  throwIfAborted(signal);
+  try {
+    await access(modelPath);
+  } catch {
+    throwIfAborted(signal);
+    const error = new Error(
+      `O modelo do perfil "${profile}" ainda não foi baixado. ` +
+        "Abra o Local Flow e baixe o modelo em Configuração antes de ditar.",
+    );
+    error.code = "MODEL_NOT_INSTALLED";
+    throw error;
+  }
+  throwIfAborted(signal);
 
   const tempRoot = path.join(os.tmpdir(), "local-flow");
   await mkdir(tempRoot, { recursive: true });
+  throwIfAborted(signal);
   const jobDir = await mkdtemp(path.join(tempRoot, "job-"));
   const audioPath = path.join(jobDir, "audio.wav");
   const outputBase = path.join(jobDir, "transcription");
   const startedAt = Date.now();
 
   try {
+    throwIfAborted(signal);
     await writeFile(audioPath, wavBuffer);
+    throwIfAborted(signal);
     const args = [
       "-m",
       modelPath,
@@ -221,12 +305,20 @@ async function transcribeWav({
       "-l",
       language,
       "-t",
-      String(Math.max(1, Math.min(threads, 24))),
-      "-nt",
-      "-oj",
-      "-of",
-      outputBase,
+      // Adapt to the CPU instead of a fixed 24: spawning more threads than the
+      // machine has cores just adds context-switching overhead and slows
+      // whisper down on smaller machines.
+      String(Math.max(1, Math.min(threads, os.cpus().length))),
     ];
+    // Dictation uses -nt (no timestamps). The meeting pipeline needs per-segment
+    // offsets to interleave speakers, so it omits -nt.
+    if (!withTimestamps) args.push("-nt");
+    // -mc 0 = don't carry decoded text as context between segments. This is the
+    // fix for whisper's repetition loop on non-speech/music audio (the system
+    // loopback often grabs a video), where it otherwise echoes one phrase over
+    // and over. Used by the meeting path.
+    if (noContext) args.push("-mc", "0");
+    args.push("-sns", "-oj", "-of", outputBase);
 
     const cleanVocabulary = (Array.isArray(vocabulary) ? vocabulary : [])
       .map((term) => String(term).trim())
@@ -241,17 +333,26 @@ async function transcribeWav({
     }
 
     await runProcess(whisperCli, args, {
-      cwd: projectRoot,
+      // Use the real temp job directory, never projectRoot: in a packaged build
+      // projectRoot points inside app.asar, which is not a real directory, and
+      // spawning with a non-existent cwd fails with "spawn <exe> ENOENT".
+      cwd: jobDir,
       timeoutMs,
+      signal,
     });
+    throwIfAborted(signal);
     const json = JSON.parse(await readFile(`${outputBase}.json`, "utf8"));
-    const text = extractTranscription(json);
-    if (!text) {
+    throwIfAborted(signal);
+    const text = stripNonSpeech(extractTranscription(json));
+    const segments = extractSegments(json);
+    if (!text && !allowEmpty) {
       throw new Error("O Whisper não reconheceu fala no áudio.");
     }
+    throwIfAborted(signal);
 
     return {
       text,
+      segments,
       profile,
       durationSeconds: wavInfo.durationSeconds,
       elapsedMs: Date.now() - startedAt,
@@ -263,9 +364,12 @@ async function transcribeWav({
 
 module.exports = {
   MODEL_FILES,
+  extractSegments,
   extractTranscription,
   getModelPath,
   inspectRuntime,
+  runProcess,
+  stripNonSpeech,
   transcribeWav,
   validateWav,
 };

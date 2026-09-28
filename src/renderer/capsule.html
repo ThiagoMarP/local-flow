@@ -6,36 +6,78 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self';"
     />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Local Flow Capsule</title>
     <link rel="stylesheet" href="./capsule.css" />
   </head>
   <body>
     <main class="capsule" id="capsule" data-state="idle">
-      <div class="status-icon">
-        <span class="mic-dot"></span>
-        <span class="success-mark">✓</span>
-        <span class="error-mark">!</span>
-        <span class="spinner"></span>
-      </div>
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+          <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
+          <path
+            d="M6 11a6 6 0 0 0 12 0"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+          <line
+            x1="12"
+            y1="17"
+            x2="12"
+            y2="21"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+      </span>
 
-      <div class="content">
-        <div class="top-line">
-          <strong id="message">Pronto</strong>
-          <span id="timer">00:00</span>
-        </div>
+      <div class="body">
+        <span class="rec-dot" aria-hidden="true"></span>
+        <span class="spinner" aria-hidden="true"></span>
         <div class="wave" id="wave" aria-hidden="true">
-          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
         </div>
+        <span class="message" id="message">Pronto</span>
+        <span class="timer" id="timer">00:00</span>
       </div>
 
-      <span class="profile" id="profile">Medium</span>
+      <div class="actions">
+        <button
+          class="act discard"
+          id="discardButton"
+          type="button"
+          aria-label="Descartar"
+        >
+          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+        <button
+          class="act confirm"
+          id="confirmButton"
+          type="button"
+          aria-label="Confirmar"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path
+              d="M5 12.5l4.5 4.5L19 7"
+              stroke="currentColor"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              fill="none"
+            />
+          </svg>
+        </button>
+      </div>
     </main>
     <script type="module" src="./capsule.js"></script>
   </body>
 </html>
-

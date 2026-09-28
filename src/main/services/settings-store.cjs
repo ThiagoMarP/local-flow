@@ -6,18 +6,38 @@ const {
 } = require("node:fs/promises");
 const path = require("node:path");
 const {
+  WRITING_PROFILES,
+  normalizeReplacements,
+  normalizeSnippets,
+} = require("./personalization-service.cjs");
+const {
   DEFAULT_MODEL,
   DEFAULT_TIMEOUT_MS,
   REVISION_MODES,
   normalizeModel,
 } = require("./revision-service.cjs");
 
-const SETTINGS_VERSION = 2;
-const ALLOWED_PROFILES = new Set(["fast", "standard", "accurate"]);
+const SETTINGS_VERSION = 8;
+const ALLOWED_PROFILES = new Set(["fast", "standard", "accurate", "parakeet"]);
+const ALLOWED_MEETING_PROFILES = new Set(["fast", "standard", "accurate"]);
+const ALLOWED_MEETING_CAPTURE_MODES = new Map([
+  ["both", "Meu microfone + áudio do sistema"],
+  ["mic", "Só o meu microfone"],
+  ["system", "Só o áudio do sistema"],
+]);
 const ALLOWED_SHORTCUTS = new Map([
   ["CommandOrControl+Shift+Space", "Ctrl+Shift+Espaço"],
   ["CommandOrControl+Alt+D", "Ctrl+Alt+D"],
   ["CommandOrControl+Shift+D", "Ctrl+Shift+D"],
+]);
+// Separate list for the meeting shortcut. All Ctrl+Alt+… to dodge the browser's
+// Ctrl+Shift+R (reload) and Ctrl+Shift+J/I/C (devtools), and never overlapping
+// the dictation accelerators above.
+const ALLOWED_MEETING_SHORTCUTS = new Map([
+  ["CommandOrControl+Alt+R", "Ctrl+Alt+R"],
+  ["CommandOrControl+Alt+M", "Ctrl+Alt+M"],
+  ["CommandOrControl+Alt+G", "Ctrl+Alt+G"],
+  ["CommandOrControl+Alt+L", "Ctrl+Alt+L"],
 ]);
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -25,13 +45,27 @@ const DEFAULT_SETTINGS = Object.freeze({
   profile: "standard",
   vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
   shortcut: "CommandOrControl+Shift+Space",
+  meetingShortcut: "CommandOrControl+Alt+R",
+  meetingCaptureMode: "both",
+  // Reunião tem modelo próprio (independente do ditado): whisper rápido por
+  // padrão (prioriza velocidade) e o LLM do resumo separado.
+  meetingProfile: "fast",
+  meetingSummaryModel: DEFAULT_MODEL,
+  nativeHotkey: true,
   microphoneId: "default",
   autoPaste: true,
-  restoreClipboard: true,
+  // Off by default: restoring the previous clipboard after pasting would push
+  // the transcription to the penultimate spot in the Windows clipboard history,
+  // so a plain Ctrl+V wouldn't paste it. Keep the transcription as the current
+  // clipboard entry instead.
+  restoreClipboard: false,
   maxRecordingSeconds: 120,
   revisionMode: "literal",
   revisionModel: DEFAULT_MODEL,
   revisionTimeoutMs: DEFAULT_TIMEOUT_MS,
+  writingProfile: "neutral",
+  replacements: [],
+  snippets: [],
   launchAtLogin: false,
   startMinimized: false,
 });
@@ -54,6 +88,17 @@ function normalizeSettings(value = {}) {
   const shortcut = ALLOWED_SHORTCUTS.has(value.shortcut)
     ? value.shortcut
     : DEFAULT_SETTINGS.shortcut;
+  const meetingShortcut = ALLOWED_MEETING_SHORTCUTS.has(value.meetingShortcut)
+    ? value.meetingShortcut
+    : DEFAULT_SETTINGS.meetingShortcut;
+  const meetingCaptureMode = ALLOWED_MEETING_CAPTURE_MODES.has(
+    value.meetingCaptureMode,
+  )
+    ? value.meetingCaptureMode
+    : DEFAULT_SETTINGS.meetingCaptureMode;
+  const meetingProfile = ALLOWED_MEETING_PROFILES.has(value.meetingProfile)
+    ? value.meetingProfile
+    : DEFAULT_SETTINGS.meetingProfile;
   const maxRecordingSeconds = Math.round(
     Math.max(
       10,
@@ -70,6 +115,17 @@ function normalizeSettings(value = {}) {
     profile,
     vocabulary: normalizeVocabulary(value.vocabulary),
     shortcut,
+    meetingShortcut,
+    meetingCaptureMode,
+    meetingProfile,
+    meetingSummaryModel: normalizeModel(
+      value.meetingSummaryModel,
+      DEFAULT_SETTINGS.meetingSummaryModel,
+    ),
+    nativeHotkey:
+      typeof value.nativeHotkey === "boolean"
+        ? value.nativeHotkey
+        : DEFAULT_SETTINGS.nativeHotkey,
     microphoneId:
       String(value.microphoneId || DEFAULT_SETTINGS.microphoneId)
         .trim()
@@ -100,6 +156,11 @@ function normalizeSettings(value = {}) {
         ),
       ),
     ),
+    writingProfile: WRITING_PROFILES.has(value.writingProfile)
+      ? value.writingProfile
+      : DEFAULT_SETTINGS.writingProfile,
+    replacements: normalizeReplacements(value.replacements),
+    snippets: normalizeSnippets(value.snippets),
     launchAtLogin:
       typeof value.launchAtLogin === "boolean"
         ? value.launchAtLogin
@@ -120,8 +181,20 @@ function publicSettings(settings) {
     allowedShortcuts: [...ALLOWED_SHORTCUTS.entries()].map(
       ([value, label]) => ({ value, label }),
     ),
+    meetingShortcutDisplay:
+      ALLOWED_MEETING_SHORTCUTS.get(settings.meetingShortcut) ||
+      ALLOWED_MEETING_SHORTCUTS.get(DEFAULT_SETTINGS.meetingShortcut),
+    allowedMeetingShortcuts: [...ALLOWED_MEETING_SHORTCUTS.entries()].map(
+      ([value, label]) => ({ value, label }),
+    ),
+    allowedMeetingCaptureModes: [
+      ...ALLOWED_MEETING_CAPTURE_MODES.entries(),
+    ].map(([value, label]) => ({ value, label })),
     allowedRevisionModes: [...REVISION_MODES.entries()].map(
       ([value, label]) => ({ value, label }),
+    ),
+    allowedWritingProfiles: [...WRITING_PROFILES.entries()].map(
+      ([value, profile]) => ({ value, label: profile.label }),
     ),
   };
 }
@@ -193,6 +266,8 @@ class SettingsStore {
 
 module.exports = {
   ALLOWED_SHORTCUTS,
+  ALLOWED_MEETING_SHORTCUTS,
+  ALLOWED_MEETING_CAPTURE_MODES,
   DEFAULT_SETTINGS,
   SettingsStore,
   normalizeSettings,

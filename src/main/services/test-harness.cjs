@@ -28,7 +28,29 @@ class TestHarness {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       if (process.env.LOCAL_FLOW_SETTINGS_PREVIEW === "1") {
         await window.webContents.executeJavaScript(
-          "document.querySelector('.advanced-panel')?.scrollIntoView({block:'start'})",
+          "new Promise((resolve) => { const tick = () => { if (document.querySelector('#revisionModeTrigger')) resolve(); else setTimeout(tick, 50); }; tick(); }).then(() => { document.querySelector('[data-page=\"settings\"].nav-item')?.click(); document.querySelector('#revisionModeTrigger')?.scrollIntoView({block:'center'}); })",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      if (process.env.LOCAL_FLOW_REVISION_MENU_PREVIEW === "1") {
+        await window.webContents.executeJavaScript(
+          "document.querySelector('#revisionModeTrigger')?.click()",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+      if (process.env.LOCAL_FLOW_SHORTCUT_MENU_PREVIEW === "1") {
+        await window.webContents.executeJavaScript(
+          "document.querySelector('#shortcutSelectTrigger')?.scrollIntoView({block:'center'})",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        await window.webContents.executeJavaScript(
+          "document.querySelector('#shortcutSelectTrigger')?.click()",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+      if (process.env.LOCAL_FLOW_PERSONALIZATION_PREVIEW === "1") {
+        await window.webContents.executeJavaScript(
+          "document.querySelector('.personalization-panel')?.scrollIntoView({block:'start'})",
         );
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
@@ -75,6 +97,13 @@ class TestHarness {
         isSelf: false,
         clipboard: this.clipboardService.snapshotText(),
       };
+      if (process.env.LOCAL_FLOW_INSERTION_TEST_MENU_TRIGGER_PATH) {
+        await writeFile(
+          process.env.LOCAL_FLOW_INSERTION_TEST_MENU_TRIGGER_PATH,
+          "menu",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
       const wavBuffer = await readFile(
         path.resolve(process.env.LOCAL_FLOW_INSERTION_TEST_AUDIO),
       );
@@ -95,10 +124,8 @@ class TestHarness {
           `A inserção falhou: ${insertion.reason} ${JSON.stringify(insertion.diagnostics)}`,
         );
       }
-      if (
-        this.clipboard.readText() !== "LOCAL_FLOW_CLIPBOARD_ORIGINAL"
-      ) {
-        throw new Error("O clipboard textual não foi restaurado.");
+      if (this.clipboard.readText() !== result.text) {
+        throw new Error("O clipboard não preservou a transcrição para Ctrl+V.");
       }
       console.log(
         `LOCAL_FLOW_INSERTION_OK=${JSON.stringify({
@@ -162,6 +189,38 @@ class TestHarness {
 
   async onDashboardReady(window) {
     console.log("LOCAL_FLOW_READY");
+    if (process.env.LOCAL_FLOW_SELECT_TEST === "1") {
+      await new Promise((resolve) => setTimeout(resolve, 1600));
+      const result = await window.webContents.executeJavaScript(`
+        (async () => {
+          document.querySelector('[data-page="settings"].nav-item').click();
+          document.querySelector('#revisionModeTrigger').click();
+          document.querySelector('#revisionModeSelectOption1').click();
+          document.querySelector('#shortcutSelectTrigger').click();
+          document.querySelector('#shortcutSelectOption1').click();
+          await new Promise((resolve) => setTimeout(resolve, 700));
+          const saved = await window.localFlow.getSettings();
+          return {
+            mode: saved.revisionMode,
+            shortcut: saved.shortcut,
+            modeLabel: document.querySelector('#revisionModeSelectValue').textContent,
+            shortcutLabel: document.querySelector('#shortcutSelectValue').textContent,
+            modelDisabled: document.querySelector('#revisionModelSelect').disabled,
+          };
+        })()
+      `);
+      console.log(`LOCAL_FLOW_SELECT_TEST=${JSON.stringify(result)}`);
+      this.app.quit();
+      return;
+    }
+    if (process.env.LOCAL_FLOW_OPEN_REVISION_SETTINGS === "1") {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      await window.webContents.executeJavaScript(
+        "document.querySelector('[data-page=\"settings\"].nav-item')?.click(); document.querySelector('#revisionModeTrigger')?.scrollIntoView({block:'center'}); document.querySelector('#revisionModeTrigger')?.click()",
+      );
+      window.show();
+      return;
+    }
     if (process.env.LOCAL_FLOW_SMOKE_TEST === "1") {
       setTimeout(() => this.app.quit(), 500);
       return;
@@ -219,17 +278,20 @@ async function runRevisionTest({
   app,
   audioPath,
   transcriptionPipeline,
+  profile = "fast",
   mode = "smart",
   model = "qwen2.5:3b",
+  writingProfile = "neutral",
 }) {
   try {
     const wavBuffer = await readFile(path.resolve(audioPath));
     const result = await transcriptionPipeline.run({
       wavBuffer,
-      profile: "fast",
+      profile,
       vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
       revisionMode: mode,
       revisionModel: model,
+      writingProfile,
       threads: 24,
     });
     console.log(`LOCAL_FLOW_REVISION_OK=${JSON.stringify(result)}`);
@@ -247,6 +309,7 @@ async function runEndToEndTest({
   audioPath,
   clipboard,
   transcriptionPipeline,
+  profile = "fast",
   mode = "literal",
   model = "qwen2.5:3b",
 }) {
@@ -254,7 +317,7 @@ async function runEndToEndTest({
     const wavBuffer = await readFile(path.resolve(audioPath));
     const result = await transcriptionPipeline.run({
       wavBuffer,
-      profile: "fast",
+      profile,
       vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
       threads: 24,
       revisionMode: mode,
@@ -272,4 +335,120 @@ async function runEndToEndTest({
   }
 }
 
-module.exports = { TestHarness, runEndToEndTest, runRevisionTest };
+async function runPersonalizationTest({
+  app,
+  audioPath,
+  transcriptionPipeline,
+}) {
+  try {
+    const wavBuffer = await readFile(path.resolve(audioPath));
+    const result = await transcriptionPipeline.run({
+      wavBuffer,
+      profile: "fast",
+      vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
+      revisionMode: "literal",
+      replacements: [{ from: "marcar", to: "agendar" }],
+      snippets: [
+        {
+          trigger: "a apresentação.",
+          expansion:
+            "a apresentação.\n\nAtenciosamente,\nMarcos",
+        },
+      ],
+      writingProfile: "professional",
+      threads: 24,
+    });
+    console.log(
+      `LOCAL_FLOW_PERSONALIZATION_OK=${JSON.stringify(result)}`,
+    );
+    app.quit();
+  } catch (error) {
+    console.error(
+      `LOCAL_FLOW_PERSONALIZATION_ERROR=${error.stack || error.message}`,
+    );
+    app.exit(1);
+  }
+}
+
+async function runHeadlessPipelineTest({
+  app,
+  clipboard,
+  env,
+  transcriptionPipeline,
+}) {
+  if (env.LOCAL_FLOW_E2E_AUDIO) {
+    await runEndToEndTest({
+      app,
+      clipboard,
+      audioPath: env.LOCAL_FLOW_E2E_AUDIO,
+      transcriptionPipeline,
+      profile: env.LOCAL_FLOW_E2E_PROFILE || "fast",
+    });
+    return true;
+  }
+  if (env.LOCAL_FLOW_REVISION_TEST_AUDIO) {
+    await runRevisionTest({
+      app,
+      audioPath: env.LOCAL_FLOW_REVISION_TEST_AUDIO,
+      transcriptionPipeline,
+      profile: env.LOCAL_FLOW_E2E_PROFILE || "fast",
+      mode: env.LOCAL_FLOW_E2E_REVISION_MODE,
+      model: env.LOCAL_FLOW_E2E_REVISION_MODEL,
+      writingProfile: env.LOCAL_FLOW_E2E_WRITING_PROFILE,
+    });
+    return true;
+  }
+  if (env.LOCAL_FLOW_PERSONALIZATION_TEST_AUDIO) {
+    await runPersonalizationTest({
+      app,
+      audioPath: env.LOCAL_FLOW_PERSONALIZATION_TEST_AUDIO,
+      transcriptionPipeline,
+    });
+    return true;
+  }
+  return false;
+}
+
+// Intercepts the global-shortcut test triggers so the production handler stays
+// focused on real dictation. Returns true when a test mode handled the press.
+function handleShortcutTestTrigger({ env = process.env, app, accelerator }) {
+  if (env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE) {
+    const target = path.resolve(env.LOCAL_FLOW_SHORTCUT_INPUT_TEST_FILE);
+    mkdir(path.dirname(target), { recursive: true })
+      .then(() =>
+        writeFile(
+          target,
+          JSON.stringify({
+            triggeredAt: new Date().toISOString(),
+            accelerator,
+          }),
+        ),
+      )
+      .then(() => {
+        console.log("LOCAL_FLOW_SHORTCUT_INPUT_TRIGGERED");
+        app.quit();
+      })
+      .catch((error) => {
+        console.error(
+          `LOCAL_FLOW_SHORTCUT_INPUT_ERROR=${error.stack || error.message}`,
+        );
+        app.exit(1);
+      });
+    return true;
+  }
+  if (env.LOCAL_FLOW_SHORTCUT_TEST === "1") {
+    console.log("LOCAL_FLOW_SHORTCUT_TRIGGERED");
+    setTimeout(() => app.quit(), 100);
+    return true;
+  }
+  return false;
+}
+
+module.exports = {
+  TestHarness,
+  handleShortcutTestTrigger,
+  runEndToEndTest,
+  runHeadlessPipelineTest,
+  runPersonalizationTest,
+  runRevisionTest,
+};

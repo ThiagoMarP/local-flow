@@ -32,6 +32,13 @@ const mainSource = await readFile(
   path.join(root, "src", "main", "main.cjs"),
   "utf8",
 );
+// Permission gating moved into its own module in Phase 8; the security control
+// still has to exist in the main process, so the verifier looks there too.
+const permissionsSource = await readFile(
+  path.join(root, "src", "main", "permissions.cjs"),
+  "utf8",
+);
+const processSource = `${mainSource}\n${permissionsSource}`;
 const mainLines = mainSource.split(/\r?\n/).length;
 const requiredSignals = [
   "requestSingleInstanceLock",
@@ -41,7 +48,7 @@ const requiredSignals = [
   "powerMonitor.on(\"lock-screen\"",
 ];
 for (const signal of requiredSignals) {
-  const present = mainSource.includes(signal);
+  const present = processSource.includes(signal);
   valid &&= present;
   console.log(`${present ? "OK" : "--"} main: ${signal}`);
 }

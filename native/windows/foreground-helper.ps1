@@ -37,6 +37,9 @@ public static class LocalFlowWindows {
     public static extern bool ShowWindowAsync(IntPtr hWnd, int command);
 
     [DllImport("user32.dll")]
+    public static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
@@ -44,12 +47,6 @@ public static class LocalFlowWindows {
         IntPtr hWnd,
         bool altTab
     );
-
-    [DllImport("user32.dll")]
-    public static extern bool BringWindowToTop(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    public static extern IntPtr SetFocus(IntPtr hWnd);
 
     [DllImport("kernel32.dll")]
     public static extern uint GetCurrentThreadId();
@@ -68,6 +65,15 @@ public static class LocalFlowWindows {
     );
 
     [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetFocus(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
     public static extern void keybd_event(
         byte virtualKey,
         byte scanCode,
@@ -79,14 +85,6 @@ public static class LocalFlowWindows {
     public static extern bool GetGUIThreadInfo(
         uint threadId,
         ref GUITHREADINFO info
-    );
-
-    [DllImport("user32.dll")]
-    public static extern IntPtr SendMessage(
-        IntPtr hWnd,
-        uint message,
-        IntPtr wParam,
-        IntPtr lParam
     );
 
     [StructLayout(LayoutKind.Sequential)]
@@ -111,13 +109,16 @@ public static class LocalFlowWindows {
     }
 
     private const int SW_RESTORE = 9;
+    private const uint GA_ROOT = 2;
     private const byte VK_CONTROL = 0x11;
     private const byte VK_SHIFT = 0x10;
     private const byte VK_MENU = 0x12;
+    private const byte VK_LWIN = 0x5B;
+    private const byte VK_RWIN = 0x5C;
     private const byte VK_SPACE = 0x20;
     private const byte VK_V = 0x56;
     private const uint KEYEVENTF_KEYUP = 0x0002;
-    private const uint WM_PASTE = 0x0302;
+    private const int GUI_MENU_FLAGS = 0x1C;
 
     public static string GetTitle(IntPtr hWnd) {
         var builder = new StringBuilder(1024);
@@ -150,6 +151,9 @@ public static class LocalFlowWindows {
 
     public static bool FocusWindow(IntPtr target) {
         if (target == IntPtr.Zero || !IsWindow(target)) return false;
+        // The capture step normally leaves the target active. Avoid touching
+        // its z-order or input focus in that common case.
+        if (GetForegroundWindow() == target) return true;
 
         IntPtr foreground = GetForegroundWindow();
         uint foregroundPid;
@@ -164,8 +168,6 @@ public static class LocalFlowWindows {
         bool attachedForeground = false;
         bool attachedTarget = false;
         try {
-            keybd_event(VK_MENU, 0, 0, UIntPtr.Zero);
-            keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             if (foregroundThread != 0 && foregroundThread != currentThread) {
                 attachedForeground = AttachThreadInput(
                     currentThread,
@@ -180,14 +182,18 @@ public static class LocalFlowWindows {
                     true
                 );
             }
-            ShowWindowAsync(target, SW_RESTORE);
-            BringWindowToTop(target);
-            bool focused = SetForegroundWindow(target);
-            if (!focused && GetForegroundWindow() != target) {
-                SwitchToThisWindow(target, true);
+            // Only un-minimize a minimized target. Calling SW_RESTORE on a
+            // maximized/fullscreen window would also un-maximize it, yanking it
+            // out of fullscreen the moment we paste into it.
+            if (IsIconic(target)) {
+                ShowWindowAsync(target, SW_RESTORE);
             }
-            SetFocus(target);
-            return focused || GetForegroundWindow() == target;
+            SetForegroundWindow(target);
+            if (GetForegroundWindow() != target) {
+                // FALSE avoids an Alt/Ctrl+Tab transition, which can leave
+                // the destination application's menu active.
+                SwitchToThisWindow(target, false);
+            }
         } finally {
             if (attachedTarget) {
                 AttachThreadInput(currentThread, targetThread, false);
@@ -196,6 +202,72 @@ public static class LocalFlowWindows {
                 AttachThreadInput(currentThread, foregroundThread, false);
             }
         }
+        for (int attempt = 0; attempt < 20; attempt++) {
+            if (GetForegroundWindow() == target) return true;
+            System.Threading.Thread.Sleep(10);
+        }
+        return false;
+    }
+
+    private static bool HasActiveModifier() {
+        return (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ||
+            (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0 ||
+            (GetAsyncKeyState(VK_MENU) & 0x8000) != 0 ||
+            (GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 ||
+            (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0;
+    }
+
+    private static bool WaitForModifiersReleased() {
+        for (int attempt = 0; attempt < 25; attempt++) {
+            if (!HasActiveModifier()) return true;
+            System.Threading.Thread.Sleep(20);
+        }
+        return !HasActiveModifier();
+    }
+
+    public static IntPtr GetFocusedChild(IntPtr target) {
+        uint processId;
+        uint threadId = GetWindowThreadProcessId(target, out processId);
+        var info = new GUITHREADINFO();
+        info.cbSize = Marshal.SizeOf(typeof(GUITHREADINFO));
+        if (threadId == 0 || !GetGUIThreadInfo(threadId, ref info)) {
+            return IntPtr.Zero;
+        }
+        if ((info.flags & GUI_MENU_FLAGS) != 0 ||
+            info.hwndMenuOwner != IntPtr.Zero) {
+            return IntPtr.Zero;
+        }
+        IntPtr focus = info.hwndFocus;
+        return focus != IntPtr.Zero &&
+            GetAncestor(focus, GA_ROOT) == target
+            ? focus : IntPtr.Zero;
+    }
+
+    private static bool RestoreFocusedChild(IntPtr target, IntPtr child) {
+        if (child == IntPtr.Zero || !IsWindow(child) ||
+            GetAncestor(child, GA_ROOT) != target) {
+            return false;
+        }
+        if (GetFocusedChild(target) == child) return true;
+        // A root HWND can own keyboard focus for browser DOM editors. Do not
+        // call SetFocus on it after focus changes, because that can discard
+        // the browser's selected text field.
+        if (child == target) return false;
+
+        uint processId;
+        uint focusThread = GetWindowThreadProcessId(child, out processId);
+        uint currentThread = GetCurrentThreadId();
+        bool attached = false;
+        try {
+            if (focusThread != 0 && focusThread != currentThread) {
+                attached = AttachThreadInput(currentThread, focusThread, true);
+                if (!attached) return false;
+            }
+            SetFocus(child);
+        } finally {
+            if (attached) AttachThreadInput(currentThread, focusThread, false);
+        }
+        return GetFocusedChild(target) == child;
     }
 
     public static void SendPaste() {
@@ -205,33 +277,27 @@ public static class LocalFlowWindows {
         keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 
-    public static string PasteToWindow(IntPtr target) {
-        if (target == IntPtr.Zero || !IsWindow(target)) return "failed";
-        if (FocusWindow(target)) {
-            System.Threading.Thread.Sleep(100);
-            SendPaste();
-            return "send-input";
+    public static string PasteToWindow(IntPtr target, IntPtr focusedChild) {
+        if (target == IntPtr.Zero || !IsWindow(target)) {
+            return "target-unavailable";
         }
-
-        uint processId;
-        uint threadId = GetWindowThreadProcessId(target, out processId);
-        var info = new GUITHREADINFO();
-        info.cbSize = Marshal.SizeOf(typeof(GUITHREADINFO));
-        if (GetGUIThreadInfo(threadId, ref info)) {
-            IntPtr recipient = info.hwndFocus != IntPtr.Zero
-                ? info.hwndFocus
-                : info.hwndActive;
-            if (recipient != IntPtr.Zero) {
-                SendMessage(
-                    recipient,
-                    WM_PASTE,
-                    IntPtr.Zero,
-                    IntPtr.Zero
-                );
-                return "wm-paste";
-            }
+        if (!WaitForModifiersReleased()) return "modifiers-active";
+        if (!FocusWindow(target)) return "foreground-denied";
+        System.Threading.Thread.Sleep(60);
+        if (GetForegroundWindow() != target) return "target-focus-lost";
+        if (!RestoreFocusedChild(target, focusedChild)) {
+            return "target-focus-lost";
         }
-        return "failed";
+        if (!WaitForModifiersReleased() || GetForegroundWindow() != target ||
+            GetFocusedChild(target) != focusedChild) {
+            return "target-focus-lost";
+        }
+        SendPaste();
+        System.Threading.Thread.Sleep(30);
+        return GetForegroundWindow() == target &&
+            GetFocusedChild(target) == focusedChild &&
+            !HasActiveModifier()
+            ? "send-input" : "target-focus-lost";
     }
 
     public static void SendToggleShortcut() {
@@ -260,6 +326,7 @@ function Get-WindowInfo([IntPtr]$Handle) {
 
     return [ordered]@{
         hwnd = $Handle.ToInt64().ToString()
+        focusHwnd = [LocalFlowWindows]::GetFocusedChild($Handle).ToInt64().ToString()
         processId = [int64]$processId
         processName = $processName
         title = [LocalFlowWindows]::GetTitle($Handle)
@@ -297,11 +364,18 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
             }
             "paste" {
                 $handle = [IntPtr]([int64]([string]$request.hwnd))
-                $method = [LocalFlowWindows]::PasteToWindow($handle)
+                $focusedChild = [IntPtr]([int64]([string]$request.focusHwnd))
+                $method = [LocalFlowWindows]::PasteToWindow(
+                    $handle,
+                    $focusedChild
+                )
                 $result = [ordered]@{
                     focused = $method -eq "send-input"
-                    pasted = $method -ne "failed"
+                    pasted = $method -eq "send-input"
+                    focusVerified = $method -eq "send-input"
+                    deliveryVerified = $false
                     method = $method
+                    reason = if ($method -eq "send-input") { $null } else { $method }
                     window = Get-WindowInfo $handle
                 }
             }

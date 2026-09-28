@@ -1,6 +1,6 @@
 # Local Flow — Plano de execução
 
-Última atualização: 2026-06-23
+Última atualização: 2026-06-24
 
 Este documento é a fonte de verdade do projeto. Uma fase só é marcada como concluída quando sua entrega funciona e os critérios de saída foram registrados.
 
@@ -26,8 +26,9 @@ Criar um aplicativo Windows de ditado local, sem limite de palavras, com:
 | 4. Integração com Windows | Concluída | Atalho e inserção automática |
 | 5. Estabilidade | Concluída | Configurações, privacidade, recuperação e otimização |
 | 6. Revisão inteligente | Concluída | Modos literal, limpo e inteligente com fallback |
-| 7. Personalização | Pendente | Dicionário, snippets e perfis |
-| 8. Distribuição | Pendente | Instalador Windows testado |
+| 7. Personalização | Concluída | Dicionário, substituições, snippets e perfis |
+| 8. Distribuição | Concluída | Instalador NSIS testado e assistente de modelos |
+| 9. Ergonomia do atalho e cápsula | Em andamento | Ctrl+Win nativo e cápsula compacta |
 
 ## Fase 0 — Arquitetura e ambiente
 
@@ -150,9 +151,38 @@ Adicionar modos literal, limpo e inteligente usando Ollama, sempre com fallback 
 
 Adicionar dicionário pessoal, snippets, substituições e perfis de escrita.
 
+### Resultado
+
+- Dicionário contextual persistente para o Whisper.
+- Substituições determinísticas sem cascata.
+- Snippets multilinha preservados após a revisão por LLM.
+- Perfis neutro, conciso, profissional e casual.
+- Editor local de regras integrado à interface.
+- Custo médio de 0,18 ms com o limite de 150 regras.
+
 ## Fase 8 — Distribuição
 
 Gerar instalador `.exe`, assistente de modelos, documentação, testes de instalação e desinstalação.
+
+### Resultado
+
+- Instalador NSIS por usuário, em pt-BR, via `electron-builder`.
+- Caminhos cientes de empacotamento: binário em `resourcesPath`, modelos em
+  pasta gravável.
+- Assistente de modelos baixa os perfis com progresso e validação.
+- Documentação `README.md` e `docs/INSTALL.md`.
+- Ciclo silencioso de instalação e desinstalação testado sem resíduos.
+
+## Fase 9 — Ergonomia do atalho e cápsula
+
+Substituir o gatilho principal por `Ctrl+Win` usando um hook de teclado nativo,
+com duas formas de ditar, e redesenhar a cápsula concluída.
+
+- Toque duplo rápido em `Ctrl+Win`: inicia e fixa a gravação; novo toque duplo
+  encerra.
+- Segurar `Ctrl+Win`: grava enquanto pressionado e transcreve ao soltar.
+- Atalho acelerador anterior permanece como alternativa configurável.
+- Cápsula concluída menor, com logo, botão de cancelar e botão de confirmar.
 
 ## Fora do primeiro ciclo
 

@@ -102,3 +102,33 @@ determinantes devem permanecer explícitos. Essa regra rejeitou uma
 revisão real que substituiu “atualizar a proposta” por “atualizá-lo”.
 Para este produto, preservar intenção é mais importante do que aplicar
 toda revisão produzida pelo modelo.
+
+## 2026-06-24 — Personalização determinística ao redor do LLM
+
+Substituições são aplicadas antes da revisão para corrigir erros
+recorrentes do Whisper. Snippets são aplicados depois da revisão para
+que seu conteúdo exato nunca seja reescrito pelo Ollama.
+
+## 2026-06-24 — Regras sem cascata
+
+Substituições e snippets usam marcadores internos temporários. Assim,
+o resultado de uma regra não dispara uma segunda regra na mesma
+execução. Frases maiores são avaliadas primeiro para evitar que uma
+regra curta consuma parte de uma expressão mais específica.
+
+## 2026-06-24 — Perfil de escrita como orientação opcional
+
+Os perfis neutro, conciso, profissional e casual alteram apenas a
+instrução enviada nos modos limpo e inteligente. O modo literal não
+inicia o Ollama, mas continua aplicando substituições e snippets.
+
+## 2026-06-24 — Empacotamento com modelos sob demanda
+
+O instalador NSIS empacota o aplicativo em `app.asar` e leva apenas o
+mecanismo `whisper.cpp` necessário como `extraResources`. Os modelos,
+que somam mais de 1,2 GB e evoluem de forma independente, ficam fora do
+instalador e são baixados pelo assistente na primeira execução. Eles
+moram em uma pasta gravável de dados do usuário, preservada entre
+atualizações. O serviço `app-paths.cjs` é a única fonte de verdade dos
+caminhos em desenvolvimento e em produção, evitando que `__dirname`
+dentro do asar quebre a localização de binários e modelos.

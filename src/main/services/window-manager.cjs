@@ -19,6 +19,8 @@ class WindowManager {
     onDashboardReady,
     onCapsuleReady,
     onQuit,
+    displayScreen = screen,
+    BrowserWindowClass = BrowserWindow,
   }) {
     this.projectRoot = projectRoot;
     this.logger = logger;
@@ -28,16 +30,24 @@ class WindowManager {
     this.onDashboardReady = onDashboardReady;
     this.onCapsuleReady = onCapsuleReady;
     this.onQuit = onQuit;
+    this.displayScreen = displayScreen;
+    this.BrowserWindowClass = BrowserWindowClass;
     this.dashboardWindow = null;
     this.capsuleWindow = null;
     this.tray = null;
     this.isQuitting = false;
     this.capsuleHideTimer = null;
+    this.capsuleWatchdog = null;
+    this.capsuleCursorPoll = null;
+    this.followCursorDisplay = false;
+    this.capsuleDisplayId = null;
+    this.lastCapsuleBounds = null;
     this.activeProfile = "standard";
     this.shortcut = {
       registered: false,
       display: "Ctrl+Shift+Espaço",
     };
+    this.hotkeyStatus = { enabled: true, ready: false, display: "Ctrl + Win" };
     this.currentUiState = normalizeUiState({
       state: "idle",
       message: "Pronto",
@@ -47,10 +57,26 @@ class WindowManager {
 
   createAll({ dashboardQuery } = {}) {
     this.createDashboard({ query: dashboardQuery });
-    if (this.automatedRun) this.createCapsule();
-    screen.on("display-metrics-changed", () => this.positionCapsule());
-    screen.on("display-added", () => this.positionCapsule());
-    screen.on("display-removed", () => this.positionCapsule());
+    this.createCapsule();
+    this.displayScreen.on("display-metrics-changed", () =>
+      this.positionCapsule({ force: true }),
+    );
+    this.displayScreen.on("display-added", () =>
+      this.positionCapsule({ force: true }),
+    );
+    this.displayScreen.on("display-removed", () =>
+      this.positionCapsule({ force: true }),
+    );
+    // The capsule is intentionally never hidden. A Windows display/DPI change
+    // can occasionally leave a transparent, non-focusable window invisible
+    // while the main process (and therefore the shortcuts) keeps running.
+    // Check infrequently to restore it without affecting active dictation.
+    if (!this.automatedRun) {
+      this.capsuleWatchdog = setInterval(
+        () => this.ensureCapsuleVisible(),
+        5000,
+      );
+    }
   }
 
   secureWindow(window) {
@@ -94,13 +120,15 @@ class WindowManager {
   }
 
   createDashboard({ query } = {}) {
-    this.dashboardWindow = new BrowserWindow({
+    this.dashboardWindow = new this.BrowserWindowClass({
       width: 820,
       height: 720,
       minWidth: 680,
       minHeight: 600,
-      backgroundColor: "#0b0d12",
+      backgroundColor: "#00000000",
+      backgroundMaterial: "acrylic",
       title: "Local Flow",
+      icon: path.join(this.projectRoot, "assets", "icon.ico"),
       show:
         (!this.automatedRun && !this.shouldStartHidden) ||
         Boolean(process.env.LOCAL_FLOW_CAPTURE_PATH) ||
@@ -132,6 +160,13 @@ class WindowManager {
         this.rebuildTrayMenu();
       }
     });
+    // Drop the reference the moment the window is gone. Without this the field
+    // keeps pointing at a destroyed BrowserWindow, and every later property
+    // access throws "TypeError: Object has been destroyed" instead of simply
+    // reading as absent.
+    this.dashboardWindow.on("closed", () => {
+      this.dashboardWindow = null;
+    });
     this.dashboardWindow.webContents.once(
       "did-finish-load",
       () => this.onDashboardReady?.(this.dashboardWindow),
@@ -139,9 +174,9 @@ class WindowManager {
   }
 
   createCapsule() {
-    this.capsuleWindow = new BrowserWindow({
-      width: 420,
-      height: 82,
+    this.capsuleWindow = new this.BrowserWindowClass({
+      width: 168,
+      height: 78,
       frame: false,
       transparent: true,
       backgroundColor: "#00000000",
@@ -168,47 +203,50 @@ class WindowManager {
     });
     this.secureWindow(this.capsuleWindow);
     this.monitorWindow(this.capsuleWindow, "capsule");
-    this.capsuleWindow.setAlwaysOnTop(true, "floating");
+    // "floating" can sit below some maximized/full-screen Windows apps. The
+    // capsule is click-through except for its explicit action buttons, so use
+    // the higher level that keeps status feedback visible in those apps too.
+    this.capsuleWindow.setAlwaysOnTop(true, "screen-saver");
     this.capsuleWindow.setIgnoreMouseEvents(true);
     this.capsuleWindow.loadFile(
       path.join(this.projectRoot, "src", "renderer", "capsule.html"),
     );
+    this.lastCapsuleBounds = null;
     this.positionCapsule();
-    this.capsuleWindow.webContents.once("did-finish-load", () => {
-      this.capsuleWindow.webContents.send(
-        "ui:state",
-        this.currentUiState,
-      );
-      this.onCapsuleReady?.(this.capsuleWindow);
+    const capsule = this.capsuleWindow;
+    this.capsuleWindow.on("closed", () => {
+      if (this.capsuleWindow === capsule) this.capsuleWindow = null;
+    });
+    this.capsuleWindow.on("hide", () => this.restoreCapsuleSoon("hidden"));
+    this.capsuleWindow.on("minimize", () =>
+      this.restoreCapsuleSoon("minimized"),
+    );
+    // Capture the window this callback belongs to: by the time did-finish-load
+    // fires, a crash-recovery pass may have replaced this.capsuleWindow, and
+    // the old closure must not touch the new window (or a destroyed one).
+    capsule.webContents.once("did-finish-load", () => {
+      if (capsule.isDestroyed()) return;
+      capsule.webContents.send("ui:state", this.currentUiState);
+      // Always visible: at rest it's a thin line at the top, growing into the
+      // full pill while recording/transcribing.
+      if (!this.automatedRun) capsule.showInactive();
+      this.onCapsuleReady?.(capsule);
     });
   }
 
   createTray() {
     this.tray = new Tray(this.createTrayIcon());
-    this.tray.setToolTip("Local Flow — ditado local");
+    this.tray.setToolTip("Local Flow");
     this.tray.on("double-click", () => this.showDashboard());
     this.rebuildTrayMenu();
   }
 
   createTrayIcon() {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
-        <defs>
-          <linearGradient id="g" x1="0" x2="1">
-            <stop stop-color="#6a8bff"/>
-            <stop offset="1" stop-color="#a56eff"/>
-          </linearGradient>
-        </defs>
-        <rect width="32" height="32" rx="10" fill="#111620"/>
-        <path d="M8 17h3l2-7 4 13 3-9 2 3h2" fill="none"
-          stroke="url(#g)" stroke-width="2.6" stroke-linecap="round"
-          stroke-linejoin="round"/>
-      </svg>`;
-    return nativeImage
-      .createFromDataURL(
-        `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
-      )
-      .resize({ width: 16, height: 16 });
+    // Mesmo icon.ico da janela (átomo completo, multi-tamanho). O Windows escolhe
+    // o tamanho embutido mais adequado ao DPI, evitando desfoque por ampliação.
+    return nativeImage.createFromPath(
+      path.join(this.projectRoot, "assets", "icon.ico"),
+    );
   }
 
   rebuildTrayMenu() {
@@ -217,6 +255,7 @@ class WindowManager {
       fast: "Rápido · Small",
       standard: "Padrão · Medium",
       accurate: "Precisão · Large V3 Turbo",
+      parakeet: "Parakeet TDT 0.6B v3",
     };
     this.tray.setContextMenu(
       Menu.buildFromTemplate([
@@ -236,9 +275,15 @@ class WindowManager {
           enabled: false,
         },
         {
+          label: this.hotkeyStatus.ready
+            ? "Ditado: Ctrl + Win (2× ou segurar)"
+            : "Ditado: Ctrl + Win indisponível",
+          enabled: false,
+        },
+        {
           label: this.shortcut.registered
-            ? `Atalho: ${this.shortcut.display}`
-            : "Atalho global indisponível",
+            ? `Alternativa: ${this.shortcut.display}`
+            : "Atalho alternativo indisponível",
           enabled: false,
         },
         { type: "separator" },
@@ -258,24 +303,108 @@ class WindowManager {
     this.rebuildTrayMenu();
   }
 
+  setHotkeyStatus(status) {
+    this.hotkeyStatus = { ...this.hotkeyStatus, ...status };
+    this.rebuildTrayMenu();
+  }
+
   setProfile(profile) {
     this.activeProfile = profile;
     this.rebuildTrayMenu();
   }
 
-  positionCapsule() {
-    if (!this.capsuleWindow || this.capsuleWindow.isDestroyed()) return;
-    let display = screen.getPrimaryDisplay();
-    if (this.dashboardWindow && !this.dashboardWindow.isDestroyed()) {
-      display = screen.getDisplayMatching(this.dashboardWindow.getBounds());
+  findCapsuleDisplay() {
+    if (this.followCursorDisplay) {
+      // Electron's screen coordinates and BrowserWindow bounds both use DIP,
+      // including negative origins on monitors above/left of the primary one.
+      try {
+        const display = this.displayScreen.getDisplayNearestPoint(
+          this.displayScreen.getCursorScreenPoint(),
+        );
+        if (display) return display;
+      } catch {
+        // Display topology can change between the two calls. Fall through to
+        // the last surviving display instead of moving the capsule off-screen.
+      }
     }
-    this.capsuleWindow.setBounds(
-      calculateCapsuleBounds(display.workArea, {
-        width: 420,
-        height: 82,
-        margin: 24,
-      }),
-    );
+    if (this.capsuleDisplayId !== null) {
+      const previous = this.displayScreen
+        .getAllDisplays()
+        .find((display) => display.id === this.capsuleDisplayId);
+      if (previous) return previous;
+    }
+    if (this.dashboardWindow && !this.dashboardWindow.isDestroyed()) {
+      return this.displayScreen.getDisplayMatching(
+        this.dashboardWindow.getBounds(),
+      );
+    }
+    return this.displayScreen.getPrimaryDisplay();
+  }
+
+  positionCapsule({ force = false } = {}) {
+    if (this.isQuitting || !this.capsuleWindow || this.capsuleWindow.isDestroyed()) {
+      return;
+    }
+    const display = this.findCapsuleDisplay();
+    if (!display?.workArea) return;
+    const bounds = calculateCapsuleBounds(display.workArea, {
+      width: 168,
+      height: 78,
+      margin: 2,
+      anchor: "top",
+    });
+    const previous = this.lastCapsuleBounds;
+    if (force || !previous || Object.keys(bounds).some((key) => bounds[key] !== previous[key])) {
+      this.capsuleWindow.setBounds(bounds);
+      this.lastCapsuleBounds = bounds;
+    }
+    this.capsuleDisplayId = display.id;
+  }
+
+  updateCursorTracking() {
+    const state = this.currentUiState.state;
+    const follow = ["recording", "meeting", "processing", "revising"].includes(state);
+    this.followCursorDisplay = follow;
+    if (follow && !this.capsuleCursorPoll) {
+      // Only the monitor changes, not the X/Y position within that monitor.
+      // A short interval catches a cursor crossing screens without a global
+      // mouse hook and remains dormant outside recording and processing.
+      this.capsuleCursorPoll = setInterval(() => this.positionCapsule(), 250);
+    } else if (!follow && this.capsuleCursorPoll) {
+      clearInterval(this.capsuleCursorPoll);
+      this.capsuleCursorPoll = null;
+    }
+  }
+
+  restoreCapsuleSoon(reason) {
+    if (this.isQuitting || this.automatedRun) return;
+    setTimeout(() => this.ensureCapsuleVisible(reason), 50);
+  }
+
+  ensureCapsuleVisible(reason = "watchdog") {
+    if (this.isQuitting || this.automatedRun) return;
+    if (!this.capsuleWindow || this.capsuleWindow.isDestroyed()) {
+      this.logger?.warn("capsule_recreated", { reason });
+      this.createCapsule();
+      return;
+    }
+
+    const capsule = this.capsuleWindow;
+    const wasMinimized = capsule.isMinimized?.() === true;
+    const wasHidden = capsule.isVisible?.() === false;
+    if (wasMinimized) capsule.restore();
+    // Reassert the top level even if Windows changed the z-order. `showInactive`
+    // preserves the currently focused app, which is essential for auto-paste.
+    capsule.setAlwaysOnTop(true, "screen-saver");
+    this.positionCapsule({ force: true });
+    if (wasMinimized || wasHidden) {
+      capsule.showInactive();
+      this.logger?.warn("capsule_restored", {
+        reason,
+        minimized: wasMinimized,
+        hidden: wasHidden,
+      });
+    }
   }
 
   showDashboard() {
@@ -295,11 +424,11 @@ class WindowManager {
 
   applyUiState(payload, options = {}) {
     this.currentUiState = normalizeUiState(payload);
+    this.updateCursorTracking();
     if (this.currentUiState.profile) {
       this.setProfile(this.currentUiState.profile);
     }
     if (!this.capsuleWindow || this.capsuleWindow.isDestroyed()) {
-      if (this.currentUiState.state === "idle") return;
       this.createCapsule();
       this.capsuleWindow.webContents.once("did-finish-load", () => {
         this.applyUiState(this.currentUiState, options);
@@ -313,32 +442,55 @@ class WindowManager {
       this.currentUiState,
     );
     if (this.currentUiState.state === "idle") {
-      this.capsuleWindow.hide();
+      // At rest the capsule stays visible as a thin line at the top.
+      this.capsuleWindow.setIgnoreMouseEvents(true);
+      this.positionCapsule();
+      this.capsuleWindow.showInactive();
       return;
     }
+    // The concluded states expose the discard/confirm buttons, so the capsule
+    // must accept clicks then; every other state stays click-through.
+    const interactive = ["success", "error"].includes(
+      this.currentUiState.state,
+    );
+    this.capsuleWindow.setIgnoreMouseEvents(!interactive);
     this.positionCapsule();
     this.capsuleWindow.showInactive();
 
-    if (
-      options.autoHide !== false &&
-      ["success", "error"].includes(this.currentUiState.state)
-    ) {
+    if (options.autoHide !== false && interactive) {
       const stateAtSchedule = this.currentUiState.state;
-      this.capsuleHideTimer = setTimeout(() => {
-        if (this.currentUiState.state === stateAtSchedule) {
-          this.currentUiState = normalizeUiState({
-            state: "idle",
-            message: "Pronto",
-            profile: this.activeProfile,
-          });
-          this.capsuleWindow.hide();
-        }
-      }, 1800);
+      this.capsuleHideTimer = setTimeout(
+        () => {
+          if (this.currentUiState.state === stateAtSchedule) {
+            this.dismissCapsule();
+          }
+        },
+        this.currentUiState.state === "success" ? 700 : 2200,
+      );
+    }
+  }
+
+  dismissCapsule() {
+    clearTimeout(this.capsuleHideTimer);
+    this.currentUiState = normalizeUiState({
+      state: "idle",
+      message: "Pronto",
+      profile: this.activeProfile,
+    });
+    if (this.capsuleWindow && !this.capsuleWindow.isDestroyed()) {
+      this.capsuleWindow.setIgnoreMouseEvents(true);
+      this.capsuleWindow.webContents.send("ui:state", this.currentUiState);
+      this.positionCapsule();
+      this.capsuleWindow.showInactive();
     }
   }
 
   beginQuit() {
     this.isQuitting = true;
+    clearInterval(this.capsuleWatchdog);
+    this.capsuleWatchdog = null;
+    clearInterval(this.capsuleCursorPoll);
+    this.capsuleCursorPoll = null;
   }
 }
 

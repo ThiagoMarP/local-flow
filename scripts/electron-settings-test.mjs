@@ -10,8 +10,16 @@ const patch = {
   profile: "fast",
   vocabulary: ["Local Flow", "Ollama"],
   maxRecordingSeconds: 60,
-  revisionMode: "clean",
+  revisionMode: "light",
   revisionModel: "qwen2.5:7b",
+  writingProfile: "professional",
+  replacements: [{ from: "zap", to: "WhatsApp" }],
+  snippets: [
+    {
+      trigger: "minha assinatura",
+      expansion: "Atenciosamente,\nMarcos",
+    },
+  ],
   autoPaste: false,
   restoreClipboard: false,
   startMinimized: true,

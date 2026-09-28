@@ -2,10 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:;"
@@ -14,212 +11,419 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <header class="header">
-        <div>
-          <p class="eyebrow">Fase 6 · revisão local</p>
-          <h1>Local Flow</h1>
-          <p class="subtitle">
-            Fale em qualquer aplicativo e insira o texto sem sair do contexto.
-          </p>
-        </div>
-        <div class="privacy">
-          <span class="privacy-dot"></span>
-          Processamento local
-        </div>
-      </header>
-
-      <section class="panel recorder-panel">
-        <div class="status-row">
-          <div>
-            <p class="label">Estado</p>
-            <p class="status" id="status">Verificando o mecanismo local…</p>
-          </div>
-          <p class="timer" id="timer">00:00</p>
-        </div>
-
-        <div class="meter" aria-hidden="true">
-          <span id="meterFill"></span>
-        </div>
-
-        <div class="controls">
-          <button class="button primary" id="recordButton" disabled>
-            Iniciar gravação
+    <div class="app">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <button class="nav-item active" data-page="home" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 11l9-7 9 7" />
+              <path d="M5 10v10h14V10" />
+            </svg>
+            Início
           </button>
-          <button class="button danger" id="stopButton" disabled>
-            Parar e transcrever
+          <button class="nav-item" data-page="history" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M12 7.5V12l3 2" />
+            </svg>
+            Histórico
           </button>
-        </div>
-      </section>
+          <button class="nav-item" data-page="meetings" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="9" cy="8" r="3.1" />
+              <path d="M3.6 19a5.4 5.4 0 0 1 10.8 0" />
+              <path d="M16 5.3a3.1 3.1 0 0 1 0 5.8" />
+              <path d="M17.4 13.7A5.4 5.4 0 0 1 20.4 19" />
+            </svg>
+            Reuniões
+          </button>
+          <button class="nav-item" data-page="settings" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="4" y1="8" x2="20" y2="8" />
+              <line x1="4" y1="16" x2="20" y2="16" />
+              <circle cx="9" cy="8" r="2.4" />
+              <circle cx="15" cy="16" r="2.4" />
+            </svg>
+            Configurações
+          </button>
+          <button class="nav-item" data-page="models" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3l9 5-9 5-9-5 9-5z" />
+              <path d="M3 13l9 5 9-5" />
+            </svg>
+            <span>Modelos</span>
+            <span
+              class="nav-alert"
+              id="modelsNavAlert"
+              role="status"
+              aria-label="É necessário baixar um modelo"
+              title="Baixe um modelo para começar"
+              hidden
+            >!</span>
+          </button>
+        </nav>
 
-      <section class="settings-grid">
-        <label class="field panel">
-          <span>Perfil do modelo</span>
-          <select id="profileSelect">
-            <option value="fast">Rápido · Small</option>
-            <option value="standard" selected>Padrão · Medium</option>
-            <option value="accurate">Precisão · Large V3 Turbo</option>
-          </select>
-        </label>
-
-        <label class="field panel">
-          <span>Vocabulário de contexto</span>
-          <input
-            id="vocabularyInput"
-            type="text"
-            value="Electron, TypeScript, Whisper, Ollama"
-            placeholder="Termos separados por vírgula"
-          />
-        </label>
-      </section>
-
-      <section class="panel shortcut-panel">
-        <div class="shortcut-copy">
-          <p class="label">Atalho global</p>
-          <p class="shortcut-description" id="shortcutDescription">
-            Pressione uma vez para iniciar e novamente para transcrever.
-          </p>
-        </div>
-        <div class="shortcut-key" id="shortcutKey">
-          Ctrl + Shift + Espaço
-        </div>
-        <span class="shortcut-status" id="shortcutStatus">Verificando…</span>
-      </section>
-
-      <details class="panel advanced-panel">
-        <summary>
-          <span>
-            <strong>Configurações</strong>
-            <small>Revisão local, privacidade e comportamento</small>
+        <div class="sidebar-brand">
+          <span class="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+              <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
+              <path
+                d="M6 11a6 6 0 0 0 12 0"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <line
+                x1="12"
+                y1="17"
+                x2="12"
+                y2="21"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
           </span>
-          <span class="settings-save-status" id="settingsSaveStatus">
-            Salvo localmente
-          </span>
-        </summary>
-
-        <div class="advanced-grid">
-          <label class="field compact">
-            <span>Microfone</span>
-            <select id="microphoneSelect">
-              <option value="default">Padrão do Windows</option>
-            </select>
-          </label>
-
-          <label class="field compact">
-            <span>Atalho</span>
-            <select id="shortcutSelect"></select>
-          </label>
-
-          <label class="field compact">
-            <span>Duração máxima</span>
-            <select id="maxDurationSelect">
-              <option value="60">1 minuto</option>
-              <option value="120">2 minutos</option>
-              <option value="300">5 minutos</option>
-              <option value="600">10 minutos</option>
-            </select>
-          </label>
-
-          <label class="field compact">
-            <span>Tratamento do texto</span>
-            <select id="revisionModeSelect">
-              <option value="literal">Literal</option>
-              <option value="clean">Limpo</option>
-              <option value="smart">Inteligente</option>
-            </select>
-          </label>
-
-          <label class="field compact">
-            <span>Modelo de revisão</span>
-            <select id="revisionModelSelect">
-              <option value="qwen2.5:3b">qwen2.5:3b</option>
-            </select>
-          </label>
-
-          <div class="local-engine-status" id="ollamaStatus">
-            <span class="status-dot"></span>
-            <span>Verificando Ollama local…</span>
-          </div>
-
-          <div class="toggle-list">
-            <label class="toggle-row">
-              <input id="autoPasteInput" type="checkbox" />
-              <span>
-                <strong>Colar automaticamente</strong>
-                <small>Insere no aplicativo anteriormente ativo.</small>
-              </span>
-            </label>
-            <label class="toggle-row">
-              <input id="restoreClipboardInput" type="checkbox" />
-              <span>
-                <strong>Restaurar texto do clipboard</strong>
-                <small>Após uma colagem bem-sucedida.</small>
-              </span>
-            </label>
-            <label class="toggle-row">
-              <input id="launchAtLoginInput" type="checkbox" />
-              <span>
-                <strong>Iniciar com o Windows</strong>
-                <small>Executa o Local Flow após entrar na conta.</small>
-              </span>
-            </label>
-            <label class="toggle-row">
-              <input id="startMinimizedInput" type="checkbox" />
-              <span>
-                <strong>Iniciar minimizado</strong>
-                <small>Mantém somente o ícone na bandeja.</small>
-              </span>
-            </label>
+          <div class="brand-text">
+            <strong>Local Flow</strong>
+            <span class="brand-sub">
+              <span class="privacy-dot"></span> Processamento local
+            </span>
           </div>
         </div>
-      </details>
+      </aside>
 
-      <section class="panel result-panel">
-        <div class="result-header">
-          <div>
-            <p class="label">Transcrição</p>
-            <p class="result-meta" id="resultMeta">
-              O resultado será copiado automaticamente.
+      <main class="app-content">
+        <!-- ===================== INÍCIO ===================== -->
+        <section class="page" data-page="home">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-value" id="statTotal">0</span>
+              <span class="stat-label">transcrições</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="statWords">0</span>
+              <span class="stat-label">palavras na semana</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="statModel">—</span>
+              <span class="stat-label">modelo ativo</span>
+            </div>
+          </div>
+
+          <section class="panel recorder-panel">
+            <div class="status-row">
+              <div>
+                <p class="label">Estado</p>
+                <p class="status" id="status" role="status">Verificando o mecanismo local…</p>
+              </div>
+              <p class="timer" id="timer">00:00</p>
+            </div>
+
+            <div class="meter" aria-hidden="true">
+              <span id="meterFill"></span>
+            </div>
+
+            <div class="controls">
+              <button class="button primary" id="recordButton" disabled>
+                Iniciar gravação
+              </button>
+              <button class="button danger" id="stopButton" disabled>
+                Parar e transcrever
+              </button>
+              <button class="button secondary" id="discardRecordingButton" disabled>
+                Cancelar ditado (Esc)
+              </button>
+            </div>
+          </section>
+
+          <section class="panel last-message-panel">
+            <div class="result-header">
+              <div>
+                <p class="label">Última mensagem</p>
+                <p class="result-meta" id="lastMessageMeta">
+                  Nenhuma transcrição ainda.
+                </p>
+              </div>
+              <div class="last-message-actions">
+                <button class="button secondary" id="copyLastButton" disabled>
+                  Copiar
+                </button>
+                <button class="button secondary" id="copyLastOriginalButton" type="button" hidden>
+                  Copiar original
+                </button>
+              </div>
+            </div>
+            <textarea
+              id="lastMessageText"
+              readonly
+              placeholder="Sua última transcrição aparecerá aqui."
+            ></textarea>
+          </section>
+
+          <section class="panel shortcut-panel">
+            <div class="shortcut-copy">
+              <p class="label">Atalho global</p>
+              <p class="shortcut-description" id="shortcutDescription">
+                Pressione uma vez para iniciar e novamente para transcrever.
+              </p>
+            </div>
+            <div class="shortcut-key" id="shortcutKey">
+              Verificando…
+            </div>
+            <span class="shortcut-status" id="shortcutStatus">Verificando…</span>
+          </section>
+        </section>
+
+        <!-- ===================== HISTÓRICO ===================== -->
+        <section class="page" data-page="history" hidden>
+          <div class="page-toolbar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.5" y2="16.5" />
+              </svg>
+              <input
+                id="historySearch"
+                type="search"
+                placeholder="Buscar no histórico"
+                autocomplete="off"
+              />
+            </div>
+            <span class="history-count">
+              <span id="historyCount">0</span> itens
+            </span>
+            <button class="button secondary" id="historyClearButton" type="button">
+              Limpar histórico
+            </button>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </section>
+
+        <!-- ===================== REUNIÕES ===================== -->
+        <section class="page" data-page="meetings" hidden>
+          <section class="panel meeting-recorder-panel">
+            <div class="status-row">
+              <div>
+                <p class="label">Gravação de reunião</p>
+                <p class="status" id="meetingStatus" role="status">Pronto para gravar.</p>
+              </div>
+              <p class="timer" id="meetingTimer">00:00</p>
+            </div>
+            <p class="meeting-capture-hint">O áudio capturado segue o modo escolhido em Configurações. Atalho: <span id="meetingShortcutHint">verificando…</span>.</p>
+            <div class="controls">
+              <button class="button primary" id="meetingStartButton" type="button" disabled>Iniciar gravação</button>
+              <button class="button danger" id="meetingStopButton" type="button" disabled>Parar reunião</button>
+            </div>
+          </section>
+          <div class="page-toolbar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.5" y2="16.5" />
+              </svg>
+              <input
+                id="meetingsSearch"
+                type="search"
+                placeholder="Buscar nas reuniões"
+                autocomplete="off"
+              />
+            </div>
+            <span class="history-count">
+              <span id="meetingsCount">0</span> reuniões
+            </span>
+          </div>
+          <div class="meetings-list" id="meetingsList"></div>
+        </section>
+
+        <!-- ===================== CONFIGURAÇÕES ===================== -->
+        <section class="page" data-page="settings" hidden>
+          <div class="settings-group">
+            <div class="settings-group-head">
+              <h2>Transcrição</h2>
+              <span class="settings-save-status" id="settingsSaveStatus">
+                Salvo localmente
+              </span>
+            </div>
+            <div class="field-grid">
+              <label class="field">
+                <span>Perfil do modelo</span>
+                <select id="profileSelect">
+                  <option value="fast">Rápido · Small</option>
+                  <option value="standard" selected>Padrão · Medium</option>
+                  <option value="accurate">Precisão · Large V3 Turbo</option>
+                  <option value="parakeet">Parakeet TDT 0.6B v3</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Microfone</span>
+                <select id="microphoneSelect">
+                  <option value="default">Padrão do Windows</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Atalho do ditado</span>
+                <select id="shortcutSelect"></select>
+              </label>
+              <label class="field">
+                <span>Atalho da reunião</span>
+                <select id="meetingShortcutSelect"></select>
+              </label>
+              <label class="field field-wide">
+                <span>Modo de captura da reunião</span>
+                <select id="meetingCaptureModeSelect"></select>
+              </label>
+              <label class="field">
+                <span>Qualidade da reunião</span>
+                <select id="meetingProfileSelect">
+                  <option value="fast">Rápido · Small</option>
+                  <option value="standard">Padrão · Medium</option>
+                  <option value="accurate">Precisão · Large V3 Turbo</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Modelo do resumo (reunião)</span>
+                <select id="meetingSummaryModelSelect"></select>
+              </label>
+              <label class="field">
+                <span>Duração máxima</span>
+                <select id="maxDurationSelect">
+                  <option value="60">1 minuto</option>
+                  <option value="120">2 minutos</option>
+                  <option value="300">5 minutos</option>
+                  <option value="600">10 minutos</option>
+                </select>
+              </label>
+              <label class="field field-wide">
+                <span>Vocabulário de contexto</span>
+                <input
+                  id="vocabularyInput"
+                  type="text"
+                  value="Electron, TypeScript, Whisper, Ollama"
+                  placeholder="Termos separados por vírgula"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-group-head"><h2>Comportamento</h2></div>
+            <div class="toggle-list">
+              <label class="toggle-row">
+                <input id="autoPasteInput" type="checkbox" />
+                <span>
+                  <strong>Colar automaticamente</strong>
+                  <small>Tenta colar no campo anteriormente ativo.</small>
+                </span>
+              </label>
+              <input id="restoreClipboardInput" type="checkbox" hidden />
+              <label class="toggle-row">
+                <input id="launchAtLoginInput" type="checkbox" />
+                <span>
+                  <strong>Iniciar com o Windows</strong>
+                  <small>Executa o Local Flow após entrar na conta.</small>
+                </span>
+              </label>
+              <label class="toggle-row">
+                <input id="startMinimizedInput" type="checkbox" />
+                <span>
+                  <strong>Iniciar minimizado</strong>
+                  <small>Mantém somente o ícone na bandeja.</small>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-group-head"><h2>Revisão local</h2></div>
+            <div class="field-grid">
+              <label class="field revision-mode-field">
+                <span>Tratamento do texto</span>
+                <select id="revisionModeSelect">
+                  <option value="literal">Literal</option>
+                  <option value="fast">Limpeza rápida</option>
+                  <option value="light">Limpeza leve (experimental)</option>
+                  <option value="clean">Limpo</option>
+                  <option value="smart">Inteligente</option>
+                  <option value="prompt">Prompt para IA</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Modelo de revisão</span>
+                <select id="revisionModelSelect">
+                  <option value="qwen2.5:3b">qwen2.5:3b</option>
+                </select>
+              </label>
+            </div>
+            <div class="local-engine-status" id="ollamaStatus">
+              <span class="status-dot"></span>
+              <span>Verificando Ollama local…</span>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-group-head"><h2>Personalização</h2></div>
+            <div class="field-grid">
+              <label class="field profile-field">
+                <span>Perfil de escrita</span>
+                <select id="writingProfileSelect">
+                  <option value="neutral">Neutro</option>
+                  <option value="concise">Conciso</option>
+                  <option value="professional">Profissional</option>
+                  <option value="casual">Casual</option>
+                </select>
+                <small>Orienta os modos limpo e inteligente.</small>
+              </label>
+            </div>
+            <div class="field-grid two">
+              <label class="field rule-editor">
+                <span>Substituições</span>
+                <textarea
+                  id="replacementRulesInput"
+                  rows="5"
+                  placeholder="zap => WhatsApp&#10;tipo =>"
+                ></textarea>
+                <small>Uma regra por linha: origem => destino.</small>
+              </label>
+              <label class="field rule-editor">
+                <span>Snippets</span>
+                <textarea
+                  id="snippetRulesInput"
+                  rows="5"
+                  placeholder="minha assinatura => Atenciosamente,\nMarcos"
+                ></textarea>
+                <small>Use \n para inserir uma quebra de linha.</small>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== MODELOS ===================== -->
+        <section class="page" data-page="models" id="setupPanel" hidden>
+          <div class="settings-group">
+            <div class="settings-group-head">
+              <h2>Modelos de voz</h2>
+              <span class="settings-save-status" id="setupSummaryStatus">
+                Verificando…
+              </span>
+            </div>
+            <div class="setup-engine-row">
+              <div class="local-engine-status" id="whisperEngineStatus">
+                <span class="status-dot"></span>
+                <span>Verificando os mecanismos de transcrição…</span>
+              </div>
+              <p class="setup-path" id="modelsDirPath"></p>
+            </div>
+            <ul class="model-list" id="modelList"></ul>
+            <p class="setup-hint">
+              Os modelos são baixados de huggingface.co e ficam salvos apenas
+              neste computador. Após o download, escolha o perfil em
+              Configurações → Transcrição.
             </p>
           </div>
-          <button class="button secondary" id="copyButton" disabled>
-            Copiar novamente
-          </button>
-        </div>
-        <textarea
-          id="resultText"
-          readonly
-          placeholder="Sua transcrição aparecerá aqui."
-        ></textarea>
-      </section>
-
-      <section class="panel tray-panel">
-        <div>
-          <p class="label">Aplicativo em segundo plano</p>
-          <p class="result-meta">
-            Fechar esta janela mantém o Local Flow disponível na bandeja.
-          </p>
-        </div>
-        <div class="demo-controls" aria-label="Prévia da cápsula">
-          <button class="demo-button" data-demo-state="recording">
-            Ouvindo
-          </button>
-          <button class="demo-button" data-demo-state="processing">
-            Processando
-          </button>
-          <button class="demo-button" data-demo-state="success">
-            Concluído
-          </button>
-          <button class="demo-button" data-demo-state="error">
-            Erro
-          </button>
-        </div>
-      </section>
-
-      <p class="footnote">
-        O arquivo de áudio é temporário e removido após a transcrição.
-      </p>
-    </main>
+        </section>
+      </main>
+    </div>
 
     <script type="module" src="./renderer.js"></script>
   </body>

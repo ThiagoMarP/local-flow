@@ -112,8 +112,11 @@ class WindowsBridge {
     return this.request("focus", { hwnd: String(hwnd) });
   }
 
-  pasteTo(hwnd) {
-    return this.request("paste", { hwnd: String(hwnd) });
+  pasteTo(hwnd, focusHwnd) {
+    return this.request("paste", {
+      hwnd: String(hwnd),
+      focusHwnd: String(focusHwnd || "0"),
+    });
   }
 
   sendToggleShortcut() {
@@ -129,4 +132,3 @@ class WindowsBridge {
 }
 
 module.exports = { WindowsBridge };
-

@@ -9,7 +9,7 @@ const {
 const path = require("node:path");
 
 const SENSITIVE_KEY =
-  /audio|text|transcri|clipboard|vocabulary|prompt|title|content|body/i;
+  /audio|text|transcri|clipboard|vocabulary|prompt|title|content|body|replacement|snippet|expansion|trigger/i;
 
 function sanitizeMetadata(value, key = "") {
   if (SENSITIVE_KEY.test(key)) return "[REDACTED]";
@@ -58,6 +58,20 @@ class PrivacyLogger {
       ...metadata,
       errorName: error?.name || "Error",
       errorCode: error?.code || null,
+      // Without these, every failure logs as a bare "TypeError" and is
+      // impossible to diagnose after the fact. Neither field can carry
+      // dictated speech: transcripts travel in the JSON file whisper writes,
+      // never through an Error. sanitizeMetadata still truncates both.
+      errorMessage: error?.message ? String(error.message) : null,
+      // Only the frames — the first line of a stack repeats the message, and
+      // three frames is enough to point at the file:line that threw.
+      errorStack: error?.stack
+        ? String(error.stack)
+            .split("\n")
+            .slice(1, 4)
+            .map((line) => line.trim())
+            .join(" | ")
+        : null,
     });
   }
 
@@ -121,4 +135,3 @@ class PrivacyLogger {
 }
 
 module.exports = { PrivacyLogger, sanitizeMetadata };
-

@@ -16,8 +16,19 @@ const server = createServer((request, response) => {
     return;
   }
   if (request.url === "/api/generate" && request.method === "POST") {
-    request.resume();
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
     request.on("end", () => {
+      const payload = JSON.parse(body);
+      if (!/profissional/i.test(payload.system)) {
+        response.statusCode = 400;
+        response.end(
+          JSON.stringify({ error: "writing-profile-missing" }),
+        );
+        return;
+      }
       response.end(
         JSON.stringify({
           response: JSON.stringify({
@@ -52,6 +63,7 @@ try {
       LOCAL_FLOW_REVISION_TEST_AUDIO: sample,
       LOCAL_FLOW_E2E_REVISION_MODE: "smart",
       LOCAL_FLOW_E2E_REVISION_MODEL: "qwen2.5:3b",
+      LOCAL_FLOW_E2E_WRITING_PROFILE: "professional",
       LOCAL_FLOW_REVISION_ENDPOINT:
         `http://127.0.0.1:${address.port}`,
     },

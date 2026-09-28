@@ -1,11 +1,16 @@
+// "processing" and "revising" are the two halves of the post-recording work:
+// whisper turning audio into text, then the local LLM cleaning that text. They
+// are separate states so the capsule can show which one is running.
 const VALID_STATES = new Set([
   "idle",
   "recording",
+  "meeting",
   "processing",
+  "revising",
   "success",
   "error",
 ]);
-const VALID_PROFILES = new Set(["fast", "standard", "accurate"]);
+const VALID_PROFILES = new Set(["fast", "standard", "accurate", "parakeet"]);
 
 function normalizeUiState(payload = {}) {
   const state = VALID_STATES.has(payload.state) ? payload.state : "idle";
@@ -22,4 +27,3 @@ function normalizeUiState(payload = {}) {
 }
 
 module.exports = { VALID_STATES, normalizeUiState };
-

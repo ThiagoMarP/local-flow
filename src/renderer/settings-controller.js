@@ -1,11 +1,21 @@
+import { createSelectPickers } from "./select-picker.js";
+import { appendReplacementRule } from "./replacement-rule.js";
+
 export function createSettingsController({
   profileSelect,
   vocabularyInput,
   microphoneSelect,
   shortcutSelect,
+  meetingShortcutSelect,
+  meetingCaptureModeSelect,
+  meetingProfileSelect,
+  meetingSummaryModelSelect,
   maxDurationSelect,
   revisionModeSelect,
   revisionModelSelect,
+  writingProfileSelect,
+  replacementRulesInput,
+  snippetRulesInput,
   autoPasteInput,
   restoreClipboardInput,
   launchAtLoginInput,
@@ -20,9 +30,16 @@ export function createSettingsController({
     vocabularyInput,
     microphoneSelect,
     shortcutSelect,
+    meetingShortcutSelect,
+    meetingCaptureModeSelect,
+    meetingProfileSelect,
+    meetingSummaryModelSelect,
     maxDurationSelect,
     revisionModeSelect,
     revisionModelSelect,
+    writingProfileSelect,
+    replacementRulesInput,
+    snippetRulesInput,
     autoPasteInput,
     restoreClipboardInput,
     launchAtLoginInput,
@@ -31,8 +48,40 @@ export function createSettingsController({
   let current;
   let ready = false;
   let saveTimer;
+  let saveInFlight = Promise.resolve();
   let busy = false;
   let revisionAvailable = false;
+  let revisionModelCount = 0;
+  const selectPickers = createSelectPickers(
+    controls.filter((control) => control instanceof HTMLSelectElement),
+  );
+
+  function parseRules(value, sourceKey, targetKey) {
+    return value
+      .split(/\r?\n/)
+      .map((line) => {
+        const separator = line.indexOf("=>");
+        if (separator < 0) return null;
+        const source = line.slice(0, separator).trim();
+        const target = line
+          .slice(separator + 2)
+          .trim()
+          .replaceAll("\\n", "\n");
+        return source
+          ? { [sourceKey]: source, [targetKey]: target }
+          : null;
+      })
+      .filter(Boolean);
+  }
+
+  function serializeRules(rules, sourceKey, targetKey) {
+    return rules
+      .map(
+        (rule) =>
+          `${rule[sourceKey]} => ${rule[targetKey].replaceAll("\n", "\\n")}`,
+      )
+      .join("\n");
+  }
 
   function readForm() {
     return {
@@ -43,11 +92,28 @@ export function createSettingsController({
         .filter(Boolean),
       microphoneId: microphoneSelect.value,
       shortcut: shortcutSelect.value,
+      meetingShortcut: meetingShortcutSelect.value,
+      meetingCaptureMode: meetingCaptureModeSelect.value,
+      meetingProfile: meetingProfileSelect.value,
+      meetingSummaryModel: meetingSummaryModelSelect.value,
       maxRecordingSeconds: Number(maxDurationSelect.value),
       revisionMode: revisionModeSelect.value,
       revisionModel: revisionModelSelect.value,
+      writingProfile: writingProfileSelect.value,
+      replacements: parseRules(
+        replacementRulesInput.value,
+        "from",
+        "to",
+      ),
+      snippets: parseRules(
+        snippetRulesInput.value,
+        "trigger",
+        "expansion",
+      ),
       autoPaste: autoPasteInput.checked,
-      restoreClipboard: restoreClipboardInput.checked,
+      // Ctrl+V being sent does not prove that the target field received text.
+      // Keep the transcription available for manual paste in that case.
+      restoreClipboard: false,
       launchAtLogin: launchAtLoginInput.checked,
       startMinimized: startMinimizedInput.checked,
     };
@@ -66,6 +132,25 @@ export function createSettingsController({
       }),
     );
     shortcutSelect.value = settings.shortcut;
+    meetingShortcutSelect.replaceChildren(
+      ...settings.allowedMeetingShortcuts.map((item) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.label;
+        return option;
+      }),
+    );
+    meetingShortcutSelect.value = settings.meetingShortcut;
+    meetingCaptureModeSelect.replaceChildren(
+      ...settings.allowedMeetingCaptureModes.map((item) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.label;
+        return option;
+      }),
+    );
+    meetingCaptureModeSelect.value = settings.meetingCaptureMode;
+    meetingProfileSelect.value = settings.meetingProfile;
     maxDurationSelect.value = String(settings.maxRecordingSeconds);
     revisionModeSelect.replaceChildren(
       ...settings.allowedRevisionModes.map((item) => {
@@ -76,41 +161,69 @@ export function createSettingsController({
       }),
     );
     revisionModeSelect.value = settings.revisionMode;
+    writingProfileSelect.replaceChildren(
+      ...settings.allowedWritingProfiles.map((item) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.label;
+        return option;
+      }),
+    );
+    writingProfileSelect.value = settings.writingProfile;
+    replacementRulesInput.value = serializeRules(
+      settings.replacements,
+      "from",
+      "to",
+    );
+    snippetRulesInput.value = serializeRules(
+      settings.snippets,
+      "trigger",
+      "expansion",
+    );
     autoPasteInput.checked = settings.autoPaste;
-    restoreClipboardInput.checked = settings.restoreClipboard;
+    restoreClipboardInput.checked = false;
     launchAtLoginInput.checked = settings.launchAtLogin;
     startMinimizedInput.checked = settings.startMinimized;
-    shortcutKey.textContent = settings.shortcutDisplay;
     syncRevisionControls();
+    selectPickers.sync();
   }
 
-  function configureRevision(revision, selectedModel) {
+  function configureRevision(revision, selectedModel, meetingSummaryModel) {
     revisionAvailable = Boolean(revision?.available);
+    revisionModelCount = revision?.models?.length || 0;
     const models = [...new Set([
       selectedModel,
+      meetingSummaryModel,
       ...(revision?.models || []),
     ].filter(Boolean))];
-    revisionModelSelect.replaceChildren(
-      ...models.map((model) => {
+    const buildOptions = () =>
+      models.map((model) => {
         const option = document.createElement("option");
         option.value = model;
         option.textContent = model;
         return option;
-      }),
-    );
+      });
+    revisionModelSelect.replaceChildren(...buildOptions());
     revisionModelSelect.value = selectedModel;
-    ollamaStatus.classList.toggle("error", !revisionAvailable);
-    ollamaStatus.lastElementChild.textContent = revisionAvailable
-      ? `Ollama local · ${revision.models.length} modelo(s)`
-      : "Ollama offline · fallback literal ativo";
+    meetingSummaryModelSelect.replaceChildren(...buildOptions());
+    meetingSummaryModelSelect.value = meetingSummaryModel;
     syncRevisionControls();
+    selectPickers.sync();
   }
 
   function syncRevisionControls() {
     revisionModelSelect.disabled =
       busy ||
       !revisionAvailable ||
-      revisionModeSelect.value === "literal";
+      ["literal", "fast"].includes(revisionModeSelect.value);
+    const quick = revisionModeSelect.value === "fast";
+    ollamaStatus.classList.toggle("error", !revisionAvailable && !quick);
+    ollamaStatus.lastElementChild.textContent = quick
+      ? "Limpeza rápida · sem chamada ao modelo"
+      : revisionAvailable
+        ? `Ollama local · ${revisionModelCount} modelo(s)`
+        : "Ollama offline · modos com IA mantêm o original";
+    selectPickers.sync();
   }
 
   async function refreshMicrophones() {
@@ -137,26 +250,52 @@ export function createSettingsController({
     )
       ? selected
       : "default";
+    selectPickers.sync();
   }
 
-  async function persist() {
-    if (!ready) return;
-    settingsSaveStatus.textContent = "Salvando…";
-    settingsSaveStatus.className = "settings-save-status saving";
-    try {
-      const settings = await window.localFlow.updateSettings(readForm());
-      current = settings;
-      shortcutKey.textContent = settings.shortcutDisplay;
-      shortcutStatus.textContent = "Ativo";
-      shortcutStatus.classList.remove("error");
-      settingsSaveStatus.textContent = "Salvo localmente";
-      settingsSaveStatus.className = "settings-save-status";
-    } catch (error) {
-      settingsSaveStatus.textContent = error.message;
-      settingsSaveStatus.className = "settings-save-status error";
-      apply(current);
-      await refreshMicrophones();
+  function persist() {
+    if (!ready) return Promise.resolve(null);
+    const draft = readForm();
+    const saving = saveInFlight.catch(() => {}).then(async () => {
+      settingsSaveStatus.textContent = "Salvando…";
+      settingsSaveStatus.className = "settings-save-status saving";
+      try {
+        const settings = await window.localFlow.updateSettings(draft);
+        current = settings;
+        settingsSaveStatus.textContent = "Salvo localmente";
+        settingsSaveStatus.className = "settings-save-status";
+        return settings;
+      } catch (error) {
+        settingsSaveStatus.textContent = error.message;
+        settingsSaveStatus.className = "settings-save-status error";
+        apply(current);
+        await refreshMicrophones();
+        return null;
+      }
+    });
+    saveInFlight = saving;
+    return saving;
+  }
+
+  async function addReplacementRule(from, to) {
+    if (!ready) throw new Error("Configurações ainda indisponíveis.");
+    // Validate before cancelling an unrelated pending settings save.
+    appendReplacementRule(readForm().replacements, from, to);
+    window.clearTimeout(saveTimer);
+    await saveInFlight;
+    const rules = appendReplacementRule(readForm().replacements, from, to);
+    const added = rules[rules.length - 1];
+    replacementRulesInput.value = serializeRules(
+      rules,
+      "from",
+      "to",
+    );
+    const saved = await persist();
+    if (!saved?.replacements.some((rule) =>
+      rule.from === added.from && rule.to === added.to)) {
+      throw new Error("Não foi possível salvar a regra.");
     }
+    replacementRulesInput.value = serializeRules(saved.replacements, "from", "to");
   }
 
   function scheduleSave() {
@@ -165,9 +304,14 @@ export function createSettingsController({
     saveTimer = window.setTimeout(persist, 350);
   }
 
+  const liveInputs = new Set([
+    vocabularyInput,
+    replacementRulesInput,
+    snippetRulesInput,
+  ]);
   for (const control of controls) {
     control.addEventListener(
-      control === vocabularyInput ? "input" : "change",
+      liveInputs.has(control) ? "input" : "change",
       scheduleSave,
     );
   }
@@ -178,19 +322,41 @@ export function createSettingsController({
   );
 
   return {
+    closeRevisionPicker: selectPickers.close,
+    syncSelectPickers: selectPickers.sync,
     get() {
       return current;
     },
+    getDraft() {
+      return { ...current, ...readForm() };
+    },
+    addReplacementRule,
     async initialize(settings, revision) {
       apply(settings);
-      configureRevision(revision, settings.revisionModel);
+      configureRevision(
+        revision,
+        settings.revisionModel,
+        settings.meetingSummaryModel,
+      );
       await refreshMicrophones();
+      if (settings.restoreClipboard) {
+        try {
+          current = await window.localFlow.updateSettings({
+            restoreClipboard: false,
+          });
+        } catch {
+          settingsSaveStatus.textContent =
+            "Não foi possível atualizar a configuração do clipboard.";
+          settingsSaveStatus.className = "settings-save-status error";
+        }
+      }
       ready = true;
     },
     setDisabled(disabled) {
       busy = disabled;
       for (const control of controls) control.disabled = disabled;
       syncRevisionControls();
+      selectPickers.sync();
     },
   };
 }
