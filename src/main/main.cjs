@@ -212,11 +212,48 @@ function handleGlobalShortcut(accelerator) {
   }
   // Mutuamente exclusivo com a GRAVAÇÃO de reunião (os dois usam o microfone).
   // O processamento em 2º plano da reunião não bloqueia o ditado.
+  toggleDictation();
+}
+
+function toggleDictation(options) {
+  // Mutuamente exclusivo com a GRAVAÇÃO de reunião (os dois usam o microfone).
+  // O processamento em 2º plano da reunião não bloqueia o ditado.
   if (meetings.blocksDictation() && shortcutController.state === "idle") {
     notify("Reunião gravando — pare a gravação antes de ditar.");
     return;
   }
-  shortcutController.toggle().catch(reportShortcutError);
+  shortcutController.toggle(options).catch(reportShortcutError);
+}
+
+// Opening the tray takes focus from the app the user was in, so whatever is in
+// the foreground then is not where the text should go. Tray actions deliver to
+// the clipboard (the capsule then shows its Ctrl+V notice).
+function trayTarget() {
+  return {
+    hwnd: null,
+    focusHwnd: null,
+    processId: null,
+    processName: "",
+    title: "",
+    isSelf: false,
+    clipboard: clipboardService.snapshotText(),
+  };
+}
+
+async function setRevisionModeFromTray(mode) {
+  try {
+    const next = await settingsStore.update({ revisionMode: mode });
+    windowManager.setRevisionMode(next.revisionMode);
+    // The dashboard sends its own revision select with each dictation; keep it
+    // in step so the next dictation uses the mode just picked.
+    const dashboard = windowManager.dashboardWindow;
+    if (dashboard && !dashboard.isDestroyed()) {
+      dashboard.webContents.send("settings:revision-mode", next.revisionMode);
+    }
+    await logger.info("revision_mode_changed", { source: "tray", mode: next.revisionMode });
+  } catch (error) {
+    logger.error("revision_mode_change_failed", error);
+  }
 }
 
 async function onDashboardReady(window) {
@@ -493,6 +530,15 @@ app.whenReady().then(async () => {
   });
 
   windowManager.setProfile(activeProfile);
+  windowManager.setRevisionMode(
+    settings.revisionMode,
+    settingsStore.getPublic().allowedRevisionModes,
+  );
+  windowManager.setTrayActions({
+    toggleDictation: () => toggleDictation({ target: trayTarget() }),
+    copyLast: () => lastTranscriptionPaster.paste({ target: trayTarget() }),
+    setRevisionMode: setRevisionModeFromTray,
+  });
   windowManager.createAll({
     dashboardQuery:
       process.env.LOCAL_FLOW_MIC_SELF_TEST === "1"

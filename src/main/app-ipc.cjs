@@ -96,6 +96,7 @@ function registerAppIpc({
         loginItemService.apply(next.launchAtLogin);
       }
       windowManager.setProfile(getActiveProfile());
+      windowManager.setRevisionMode(next.revisionMode);
       applyUiState({
         ...windowManager.currentUiState,
         profile: getActiveProfile(),
@@ -122,6 +123,7 @@ function registerAppIpc({
     shortcuts.updateRepaste(defaults.repasteShortcut);
     setActiveProfile(defaults.profile);
     windowManager.setProfile(getActiveProfile());
+    windowManager.setRevisionMode(defaults.revisionMode);
     if (previous.launchAtLogin && canManageLoginItem) {
       loginItemService.apply(false);
     }

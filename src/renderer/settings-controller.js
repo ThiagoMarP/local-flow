@@ -343,6 +343,14 @@ export function createSettingsController({
       return { ...current, ...readForm() };
     },
     addReplacementRule,
+    // A mode picked elsewhere (the tray) and already saved by main: reflect it
+    // without saving again.
+    applyRevisionMode(mode) {
+      if (![...revisionModeSelect.options].some((option) => option.value === mode)) return;
+      revisionModeSelect.value = mode;
+      if (current) current = { ...current, revisionMode: mode };
+      syncRevisionControls();
+    },
     async initialize(settings, revision) {
       apply(settings);
       configureRevision(

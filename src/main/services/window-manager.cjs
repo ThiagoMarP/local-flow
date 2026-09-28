@@ -8,6 +8,7 @@ const {
 const path = require("node:path");
 const { calculateCapsuleBounds } = require("../window-layout.cjs");
 const { normalizeUiState } = require("../ui-state.cjs");
+const { buildTrayTemplate } = require("../tray-menu.cjs");
 
 // Wide enough for a short error phrase. The window is click-through outside
 // the pill, so the extra transparent width costs nothing.
@@ -44,6 +45,7 @@ class WindowManager {
     onQuit,
     displayScreen = screen,
     BrowserWindowClass = BrowserWindow,
+    MenuClass = Menu,
   }) {
     this.projectRoot = projectRoot;
     this.logger = logger;
@@ -55,6 +57,13 @@ class WindowManager {
     this.onQuit = onQuit;
     this.displayScreen = displayScreen;
     this.BrowserWindowClass = BrowserWindowClass;
+    this.MenuClass = MenuClass;
+    // Tray actions wired by main, the revision mode shown in the tray submenu,
+    // and a key of the last menu built so unchanged state does not rebuild it.
+    this.trayActions = {};
+    this.revisionMode = "literal";
+    this.revisionModes = [];
+    this.trayMenuKey = null;
     this.dashboardWindow = null;
     this.capsuleWindow = null;
     this.tray = null;
@@ -278,59 +287,56 @@ class WindowManager {
 
   rebuildTrayMenu() {
     if (!this.tray) return;
-    const profileLabels = {
-      fast: "Rápido · Small",
-      standard: "Padrão · Medium",
-      accurate: "Precisão · Large V3 Turbo",
-      parakeet: "Parakeet TDT 0.6B v3",
+    const content = {
+      dictationState: this.currentUiState.state,
+      dashboardVisible: Boolean(this.dashboardWindow?.isVisible()),
+      profile: this.activeProfile,
+      hotkey: this.hotkeyStatus,
+      shortcut: this.shortcut,
+      repaste: this.repasteStatus,
+      revisionMode: this.revisionMode,
+      revisionModes: this.revisionModes,
     };
+    // applyUiState runs on every microphone level sample; only rebuild when
+    // something the menu shows actually changed.
+    const key = JSON.stringify(content);
+    if (key === this.trayMenuKey) return;
+    this.trayMenuKey = key;
+    const noop = () => {};
     this.tray.setContextMenu(
-      Menu.buildFromTemplate([
-        { label: "Abrir Local Flow", click: () => this.showDashboard() },
-        {
-          label: this.dashboardWindow?.isVisible()
-            ? "Ocultar painel"
-            : "Mostrar painel",
-          click: () => {
-            if (this.dashboardWindow?.isVisible()) this.hideDashboard();
-            else this.showDashboard();
+      this.MenuClass.buildFromTemplate(
+        buildTrayTemplate({
+          ...content,
+          actions: {
+            toggleDictation: this.trayActions.toggleDictation || noop,
+            copyLast: this.trayActions.copyLast || noop,
+            setRevisionMode: this.trayActions.setRevisionMode || noop,
+            showDashboard: () => this.showDashboard(),
+            toggleDashboard: () => {
+              if (this.dashboardWindow?.isVisible()) this.hideDashboard();
+              else this.showDashboard();
+            },
+            quit: () => {
+              this.isQuitting = true;
+              this.onQuit?.();
+            },
           },
-        },
-        { type: "separator" },
-        {
-          label: `Perfil: ${profileLabels[this.activeProfile]}`,
-          enabled: false,
-        },
-        {
-          label: this.hotkeyStatus.ready
-            ? "Ditado: Ctrl + Win (2× ou segurar)"
-            : "Ditado: Ctrl + Win indisponível",
-          enabled: false,
-        },
-        {
-          label: this.shortcut.registered
-            ? `Alternativa: ${this.shortcut.display}`
-            : "Atalho alternativo indisponível",
-          enabled: false,
-        },
-        {
-          label: this.repasteStatus.disabled
-            ? "Colar última: desativado"
-            : this.repasteStatus.registered
-              ? `Colar última: ${this.repasteStatus.display}`
-              : `Colar última: ${this.repasteStatus.display} indisponível`,
-          enabled: false,
-        },
-        { type: "separator" },
-        {
-          label: "Sair",
-          click: () => {
-            this.isQuitting = true;
-            this.onQuit?.();
-          },
-        },
-      ]),
+        }),
+      ),
     );
+  }
+
+  setTrayActions(actions) {
+    this.trayActions = { ...actions };
+    this.trayMenuKey = null;
+    this.rebuildTrayMenu();
+  }
+
+  // `modes` ({ value, label }[]) only needs passing once.
+  setRevisionMode(mode, modes) {
+    this.revisionMode = mode;
+    if (modes) this.revisionModes = modes;
+    this.rebuildTrayMenu();
   }
 
   setShortcutStatus(shortcut) {
@@ -473,9 +479,8 @@ class WindowManager {
   applyUiState(payload, options = {}) {
     this.currentUiState = normalizeUiState(payload);
     this.updateCursorTracking();
-    if (this.currentUiState.profile) {
-      this.setProfile(this.currentUiState.profile);
-    }
+    // setProfile rebuilds the tray, which also picks up the dictation state.
+    this.setProfile(this.currentUiState.profile);
     if (!this.capsuleWindow || this.capsuleWindow.isDestroyed()) {
       this.createCapsule();
       this.capsuleWindow.webContents.once("did-finish-load", () => {

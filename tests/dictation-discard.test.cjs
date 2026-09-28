@@ -83,6 +83,7 @@ function createRenderer(options = {}) {
     onTranscriptionProgress(listener) { progressHandler = listener; },
     onMeetingStatus() {},
     onNavigate() {},
+    onRevisionModeChanged() {},
     updateUiState(state) { uiStates.push(state); },
     reportDictationEvent(event) {
       events.push(event);
