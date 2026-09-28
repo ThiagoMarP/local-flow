@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-09-25T12:16:22.795Z",
+  "summary": {
+    "model": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+    "samples": 10,
+    "averageWer": 0.19595399698340873,
+    "averageElapsedMs": 1226.9
+  },
+  "details": [
+    {
+      "sample": "01-mensagem.wav",
+      "expected": "Oi, João. Eu consigo terminar essa tarefa amanhã no fim da tarde.",
+      "actual": "Bom, eu consigo terminar essa tarefa amanhã, no fim da tarde.",
+      "wer": 0.16666666666666666,
+      "elapsedMs": 1471
+    },
+    {
+      "sample": "02-correcao.wav",
+      "expected": "A reunião será na terça-feira, às três da tarde.",
+      "actual": "A reunião será na terça-feira, às três da tarde.",
+      "wer": 0,
+      "elapsedMs": 1714
+    },
+    {
+      "sample": "03-numeros.wav",
+      "expected": "O orçamento ficou em dois mil quatrocentos e cinquenta reais.",
+      "actual": "O orçamento ficou em R$ 2.450.",
+      "wer": 0.6,
+      "elapsedMs": 1066
+    },
+    {
+      "sample": "04-email.wav",
+      "expected": "Bom dia, gostaria de confirmar o recebimento dos documentos enviados ontem.",
+      "actual": "Bom dia, gostaria de confirmar o recebimento dos documentos enviados ontem.",
+      "wer": 0,
+      "elapsedMs": 1084
+    },
+    {
+      "sample": "05-lista.wav",
+      "expected": "Precisamos revisar o contrato, atualizar a proposta e marcar a apresentação.",
+      "actual": "Precisamos revisar o contrato, atualizar a proposta e marcar a apresentação.",
+      "wer": 0,
+      "elapsedMs": 1138
+    },
+    {
+      "sample": "06-tecnico.wav",
+      "expected": "O projeto usa Electron, TypeScript, Whisper e Ollama.",
+      "actual": "O projeto usa Electron, TypeScript, Whisper e OLAM.",
+      "wer": 0.125,
+      "elapsedMs": 1118
+    },
+    {
+      "sample": "07-codigo.wav",
+      "expected": "Crie uma função assíncrona que valide o token antes de chamar a API.",
+      "actual": "Crie uma função assíncrona que valide o token antes de chamar a API.",
+      "wer": 0,
+      "elapsedMs": 1035
+    },
+    {
+      "sample": "08-data.wav",
+      "expected": "A entrega está prevista para vinte e três de junho de dois mil e vinte e seis.",
+      "actual": "A entrega está prevista para 23 de junho de 2026.",
+      "wer": 0.5294117647058824,
+      "elapsedMs": 1396
+    },
+    {
+      "sample": "09-pontuacao.wav",
+      "expected": "Se o cliente aprovar, seguimos com a implementação; caso contrário, revisamos o escopo.",
+      "actual": "Se aprovar, seguimos com a implementação. Caso contrário, revisamos o scopo.",
+      "wer": 0.23076923076923078,
+      "elapsedMs": 1213
+    },
+    {
+      "sample": "10-natural.wav",
+      "expected": "Eu estava pensando em começar pela versão mais simples e melhorar aos poucos.",
+      "actual": "Eu só começar pela versão mais simples e melhorará aos poucos.",
+      "wer": 0.3076923076923077,
+      "elapsedMs": 1034
+    }
+  ]
+}
