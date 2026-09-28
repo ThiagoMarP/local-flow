@@ -1,0 +1,250 @@
+{
+  "rounds": 3,
+  "configs": [
+    {
+      "key": "parakeet",
+      "model": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+      "language": null,
+      "port": 18201
+    },
+    {
+      "key": "nemotron-ptBR",
+      "model": "nemotron-3.5-asr-streaming-0.6b.q8_0.gguf",
+      "language": "pt-BR",
+      "port": 18202
+    },
+    {
+      "key": "nemotron-auto",
+      "model": "nemotron-3.5-asr-streaming-0.6b.q8_0.gguf",
+      "language": "auto",
+      "port": 18203
+    }
+  ],
+  "results": {
+    "parakeet": {
+      "loadMs": 1031,
+      "rows": [
+        {
+          "id": "01-mensagem",
+          "ms": 930,
+          "wer": 0.16666666666666666,
+          "language": "",
+          "text": "Bom, eu consigo terminar essa tarefa amanhã, no fim da tarde."
+        },
+        {
+          "id": "02-correcao",
+          "ms": 1177,
+          "wer": 0,
+          "language": "",
+          "text": "A reunião será na terça-feira, às três da tarde."
+        },
+        {
+          "id": "03-numeros",
+          "ms": 522,
+          "wer": 0.6,
+          "language": "",
+          "text": "O orçamento ficou em R$ 2.450."
+        },
+        {
+          "id": "04-email",
+          "ms": 618,
+          "wer": 0,
+          "language": "",
+          "text": "Bom dia, gostaria de confirmar o recebimento dos documentos enviados ontem."
+        },
+        {
+          "id": "05-lista",
+          "ms": 574,
+          "wer": 0,
+          "language": "",
+          "text": "Precisamos revisar o contrato, atualizar a proposta e marcar a apresentação."
+        },
+        {
+          "id": "06-tecnico",
+          "ms": 587,
+          "wer": 0.125,
+          "language": "",
+          "text": "O projeto usa Electron, TypeScript, Whisper e OLAM."
+        },
+        {
+          "id": "07-codigo",
+          "ms": 473,
+          "wer": 0,
+          "language": "",
+          "text": "Crie uma função assíncrona que valide o token antes de chamar a API."
+        },
+        {
+          "id": "08-data",
+          "ms": 844,
+          "wer": 0.5294117647058824,
+          "language": "",
+          "text": "A entrega está prevista para 23 de junho de 2026."
+        },
+        {
+          "id": "09-pontuacao",
+          "ms": 719,
+          "wer": 0.23076923076923078,
+          "language": "",
+          "text": "Se aprovar, seguimos com a implementação. Caso contrário, revisamos o scopo."
+        },
+        {
+          "id": "10-natural",
+          "ms": 526,
+          "wer": 0.3076923076923077,
+          "language": "",
+          "text": "Eu só começar pela versão mais simples e melhorará aos poucos."
+        }
+      ]
+    },
+    "nemotron-ptBR": {
+      "loadMs": 2417,
+      "rows": [
+        {
+          "id": "01-mensagem",
+          "ms": 1381,
+          "wer": 0.16666666666666666,
+          "language": "pt-PT",
+          "text": "Eu consigo terminar essa tarefa amanhã no fim da tarde."
+        },
+        {
+          "id": "02-correcao",
+          "ms": 1560,
+          "wer": 0,
+          "language": "pt-PT",
+          "text": "A reunião será na terça feira às três da tarde."
+        },
+        {
+          "id": "03-numeros",
+          "ms": 706,
+          "wer": 0.1,
+          "language": "pt-PT",
+          "text": "O estamento ficou em dois mil quatrocentos e cinquenta reais."
+        },
+        {
+          "id": "04-email",
+          "ms": 724,
+          "wer": 0.18181818181818182,
+          "language": "pt-PT",
+          "text": "Gostaria de confirmar o recebimento dos documentos enviados ontem."
+        },
+        {
+          "id": "05-lista",
+          "ms": 757,
+          "wer": 0,
+          "language": "pt-PT",
+          "text": "Precisamos revisar o contrato atualizar a proposta e marcar a apresentação."
+        },
+        {
+          "id": "06-tecnico",
+          "ms": 670,
+          "wer": 1,
+          "language": "pt-BR",
+          "text": ""
+        },
+        {
+          "id": "07-codigo",
+          "ms": 641,
+          "wer": 0.3076923076923077,
+          "language": "pt-PT",
+          "text": "Criação assíncrona que valide o token antes de chamar Api."
+        },
+        {
+          "id": "08-data",
+          "ms": 1065,
+          "wer": 0.23529411764705882,
+          "language": "pt-PT",
+          "text": "A diário que está entre está prevista para vinte e três de junho de dois mil e vinte e seis."
+        },
+        {
+          "id": "09-pontuacao",
+          "ms": 775,
+          "wer": 0.15384615384615385,
+          "language": "pt-BR",
+          "text": "Se o Ropar seguimos com a implementação caso contrário revisamos o escopo"
+        },
+        {
+          "id": "10-natural",
+          "ms": 610,
+          "wer": 0.7692307692307693,
+          "language": "pt-PT",
+          "text": "melhorar aos poucos."
+        }
+      ]
+    },
+    "nemotron-auto": {
+      "loadMs": 2312,
+      "rows": [
+        {
+          "id": "01-mensagem",
+          "ms": 1086,
+          "wer": 0.16666666666666666,
+          "language": "pt-PT",
+          "text": "Eu consigo terminar essa tarefa amanhã no fim da tarde."
+        },
+        {
+          "id": "02-correcao",
+          "ms": 1271,
+          "wer": 0,
+          "language": "pt-PT",
+          "text": "A reunião será na terça-feira às três da tarde."
+        },
+        {
+          "id": "03-numeros",
+          "ms": 600,
+          "wer": 0.1,
+          "language": "pt-PT",
+          "text": "O estamento ficou em dois mil quatrocentos e cinquenta reais."
+        },
+        {
+          "id": "04-email",
+          "ms": 647,
+          "wer": 0.18181818181818182,
+          "language": "pt-PT",
+          "text": "Die gostaria de confirmar o recebimento dos documentos enviados ontem."
+        },
+        {
+          "id": "05-lista",
+          "ms": 695,
+          "wer": 0,
+          "language": "pt-PT",
+          "text": "Precisamos revisar o contrato, atualizar a proposta e marcar a apresentação."
+        },
+        {
+          "id": "06-tecnico",
+          "ms": 635,
+          "wer": 0.625,
+          "language": "fi-FI",
+          "text": "To use Electron TypeScript Whisper Yolan."
+        },
+        {
+          "id": "07-codigo",
+          "ms": 521,
+          "wer": 0.38461538461538464,
+          "language": "pt-PT",
+          "text": "Criação assimcrona que valide o token antes de chamar API."
+        },
+        {
+          "id": "08-data",
+          "ms": 956,
+          "wer": 0.23529411764705882,
+          "language": "pt-PT",
+          "text": "A diário que está entre está prevista para vinte e três de junho de dois mil e vinte e seis."
+        },
+        {
+          "id": "09-pontuacao",
+          "ms": 773,
+          "wer": 0.23076923076923078,
+          "language": "pt-PT",
+          "text": "Se o Ropar seguimos com a implementação, caso contrário, revisamos do escopo."
+        },
+        {
+          "id": "10-natural",
+          "ms": 562,
+          "wer": 0.3076923076923077,
+          "language": "pt-PT",
+          "text": "Eu sou em conversar pela versão mais simples, melhorar aos poucos."
+        }
+      ]
+    }
+  }
+}

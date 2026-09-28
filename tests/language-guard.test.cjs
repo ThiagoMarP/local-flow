@@ -1,0 +1,37 @@
+const assert = require("node:assert/strict");
+const test = require("node:test");
+const { looksLikeEnglishDrift } = require("../src/main/services/language-guard.cjs");
+
+test("detecta ditado em português que o Parakeet ouviu como inglês", () => {
+  // Saída real do Parakeet para uma fala em português.
+  const result = looksLikeEnglishDrift(
+    "I preciso de algum lugar to hospedar tocar para rodar, to have those questions. " +
+      "And my reunion with Flávio, he followed that he was for a Martin.",
+  );
+  assert.equal(result.drifted, true);
+  assert.ok(result.englishHits > result.portugueseHits);
+});
+
+test("português cheio de termos técnicos em inglês continua português", () => {
+  for (const text of [
+    "Faz o deploy e roda o build, depois dá um push na main.",
+    "Vibe coding com Claude Code: o agent roda os tests e faz o commit.",
+    "O projeto usa Electron, TypeScript, Whisper e Ollama.",
+    "Crie uma função assíncrona que valide o token antes de chamar a API.",
+  ]) {
+    assert.equal(looksLikeEnglishDrift(text).drifted, false, text);
+  }
+});
+
+test("palavras que existem nos dois idiomas não contam como inglês", () => {
+  // "for", "a", "no" e "do" são comuns em português.
+  const result = looksLikeEnglishDrift("Se ele for a Recife, não do jeito que falamos no começo.");
+  assert.equal(result.englishHits, 0);
+  assert.equal(result.drifted, false);
+});
+
+test("textos curtos não disparam o detector", () => {
+  assert.equal(looksLikeEnglishDrift("OK").drifted, false);
+  assert.equal(looksLikeEnglishDrift("Thank you.").drifted, false);
+  assert.equal(looksLikeEnglishDrift("").drifted, false);
+});

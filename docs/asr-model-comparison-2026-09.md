@@ -45,8 +45,29 @@ colagem automática não foram medidos nessa comparação.
 2. **Candidato mais interessante para ditado contínuo: Nemotron 3.5 ASR 0.6B.** Ele é mais novo, tem locale explícito `pt-BR`, streaming cache-aware e WER FLEURS de 5,48%. Também ocupa cerca de 742 MB em Q8. O modelo é `openmdw-1.1`; conferir os termos antes de redistribuir em um serviço cloud.
 3. **Qwen3-ASR 0.6B fica como terceiro teste.** É Apache-2.0, aceita contexto/hotwords e teve FLEURS pt de 6,21%, mas sua arquitetura é um speech-LLM: o GGUF Q8 oficial tem 805 MB e a execução exige um runtime próprio/llama.cpp. O resultado em MLC-SLM (34,97%) recomenda não assumir superioridade em fala espontânea brasileira.
 
-Nemotron e Qwen ainda não foram medidos nos dez áudios locais. Os resultados
-públicos não substituem esse teste no computador do usuário.
+Qwen ainda não foi medido nos dez áudios locais. Os resultados públicos não
+substituem esse teste no computador do usuário.
+
+### Nemotron 3.5 medido em 28/09/2026: descartado
+
+Motivo do teste: no uso diário, o Parakeet às vezes decide que um ditado em
+português é inglês e transcreve a frase inteira em inglês. O Parakeet v3 não
+aceita idioma fixo; o Nemotron aceita `pt-BR`.
+
+Nos dez áudios, com servidor quente (resultado bruto em
+[asr-nemotron-vs-parakeet-2026-09-28.json](../outputs/asr-nemotron-vs-parakeet-2026-09-28.json)):
+
+| | Parakeet v3 | Nemotron `pt-BR` | Nemotron automático |
+|---|---|---|---|
+| Mediana por áudio | 618 ms | 757 ms | 695 ms |
+| Falhas graves | nenhuma | texto vazio em `06-tecnico`; frase cortada em `10-natural` | `06-tecnico` saiu em inglês ("To use Electron TypeScript...") |
+
+O Nemotron também trocou palavras que o Parakeet acerta ("orçamento" virou
+"estamento"). O WER normalizado penaliza o Parakeet em `03` e `08` só porque
+ele escreve números em algarismos. Conclusão: o idioma fixo não resolveu, e o
+Parakeet segue como motor de ditado. A deriva para o inglês passou a ser
+tratada por um detector que retranscreve no Whisper com `pt` fixo
+([language-guard.cjs](../src/main/services/language-guard.cjs)).
 
 ## Estado do runtime no Windows
 

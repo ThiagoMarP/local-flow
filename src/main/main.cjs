@@ -142,6 +142,7 @@ const transcribeDictation = createTranscriber({
   parakeetServer,
   onParakeetServerFallback: (error) =>
     logger?.warn("parakeet_server_fallback", { reason: error.message }),
+  onLanguageFallback: (counts) => logger?.warn("parakeet_language_fallback", counts),
 });
 
 const hasSingleInstanceLock = automatedRun
