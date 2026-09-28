@@ -1,6 +1,6 @@
 # Roadmap de Melhorias — Local Flow
 
-Documento vivo com as melhorias e ajustes acordados. Atualizado em 30/06/2026.
+Documento vivo com as melhorias e ajustes acordados. Atualizado em 28/09/2026.
 
 ## Como vamos trabalhar (loop de build/teste)
 
@@ -27,12 +27,13 @@ Pra não cair de novo no ciclo manual doloroso de fechar app → buildar → rei
 | ✅ | **Pré-checagem "nada falado"** (pula transcrição no silêncio, resposta instantânea) |
 | ✅ | Sensibilidade do áudio (curva perceptual) + alucinações `[MÚSICA]` (`-sns` + strip) |
 | ✅ | **Cápsula — fluxo de animação** (sem flash; loading L→R; **pulso de conclusão**) + tons do dashboard unificados à sidebar |
-| ⏸️ | **Auto-update / instalar no app** — travado pelo **Smart App Control** (desligar SAC vs assinar) |
-| ⏸️ | **Parakeet** (velocidade) — travado: binário antigo incompatível com modelo novo + SAC bloqueia binário novo |
+| ✅ | **Instalar no app** — destravado: o SAC está **desligado** nesta máquina (conferido em 28/09/2026). `npm run deploy` instalou 0.8.15, 0.8.16 e 0.8.17 sem bloqueio. |
+| ⏸️ | **Auto-update** — não depende mais do SAC nesta máquina; falta decidir o host das releases (o repositório já existe no GitHub, privado). Para outras máquinas com SAC ligado, assinar continua sendo o caminho. |
+| ✅ | **Parakeet** (velocidade) — em uso diário com o runtime oficial NeMo-Speech, servidor quente e detector de idioma (ver item 4). |
 | ✅ | **Servidor quente do Parakeet** (28/09/2026): o Parakeet virou o modelo do dia a dia, então a decisão de junho foi revista. [parakeet-server.cjs](src/main/services/parakeet-server.cjs) sobe o `nemo-speech serve` no primeiro ditado e desliga após 10 min ocioso; se falhar, cai no CLI. Medido nos 10 áudios de `benchmarks/samples`: mediana de 1234 ms para 582 ms, texto idêntico, ~800 MB de RAM enquanto ligado. |
 | ⏸️ | **Servidor quente do Whisper** (`whisper-server`): segue adiado; os perfis Whisper continuam com um processo por ditado. |
 
-> Estamos desenvolvendo via **`npm start`** (funciona sob o SAC); o `npm run deploy` e o auto-update ficam pra quando decidirmos o SAC.
+> Desde que o SAC foi desligado, o ciclo é: **`npm start`** para iterar e **`npm run deploy`** para pôr a versão no app instalado. O auto-update segue pendente da escolha do host.
 
 ---
 
@@ -66,6 +67,8 @@ Implementado e validado (30/06/2026) em [capsule.css](src/renderer/capsule.css),
 - `npm start` **funciona** sob o SAC (roda o `electron.exe`, que é assinado) → é o loop de dev/teste das features.
 - Pôr a versão final no **app instalado** (e qualquer auto-update via instalador) exige: **(a) desligar o SAC** (irreversível sem resetar o Windows) **ou (b) assinar o app** com certificado confiável (EV p/ confiança imediata; custa). Decisão a tomar quando as features estiverem prontas.
 - `electron-updater` fica **em espera** até resolver o SAC (o update também instala um `.exe`, então seria barrado igual).
+
+**Atualização (28/09/2026):** o SAC está **desligado** nesta máquina (`HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState = 0`; o Defender informa `SmartAppControlState: Off`). Não se sabe a data exata em que foi desligado. Na prática, a opção (a) acima está tomada: `npm run deploy` instalou três versões seguidas sem bloqueio. Como desligar o SAC não tem volta sem reinstalar o Windows, isso vale para esta máquina; quem instalar o Local Flow num Windows 11 com SAC ligado ainda esbarra no bloqueio, e aí só a assinatura resolve.
 
 ---
 
