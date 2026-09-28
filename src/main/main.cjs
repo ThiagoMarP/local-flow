@@ -43,6 +43,7 @@ const { DictationSession } = require("./dictation-session.cjs");
 const { MeetingController } = require("./meeting-controller.cjs");
 const { configureMicrophonePermission } = require("./permissions.cjs");
 const { runSetupSelfTest, registerSetupIpc } = require("./setup-ipc.cjs");
+const { LastTranscriptionPaster } = require("./repaste.cjs");
 const { ShortcutRegistry } = require("./shortcut-registry.cjs");
 const { ToggleDictationController } = require("./shortcut-controller.cjs");
 const { EscapeShortcut } = require("./escape-shortcut.cjs");
@@ -437,6 +438,19 @@ app.whenReady().then(async () => {
     isDictationRecording: () =>
       ["starting", "recording"].includes(shortcutController?.state),
   });
+  const lastTranscriptionPaster = new LastTranscriptionPaster({
+    historyStore,
+    captureTarget: captureDictationTarget,
+    clipboardService,
+    settingsStore,
+    isBusy: () => dictation.isBusy(),
+    // A meeting capture keeps its REC capsule; the paste still happens.
+    showState: (uiState) => {
+      if (!meetings.ownsCapsule()) applyUiState(uiState);
+    },
+    getProfile: () => activeProfile,
+    logger,
+  });
   shortcuts = new ShortcutRegistry({
     app,
     globalShortcut,
@@ -444,6 +458,7 @@ app.whenReady().then(async () => {
     windowManager,
     onDictation: handleGlobalShortcut,
     onMeeting: () => meetings.toggle(),
+    onRepaste: () => lastTranscriptionPaster.paste(),
     disableEscape: () => escapeShortcut?.setEnabled(false),
     syncEscape: () => dictation.syncEscapeShortcut(),
   });

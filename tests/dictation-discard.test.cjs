@@ -76,6 +76,7 @@ function createRenderer(options = {}) {
     onUiState() {},
     onTranscriptionProgress(listener) { progressHandler = listener; },
     onMeetingStatus() {},
+    onNavigate() {},
     updateUiState(state) { uiStates.push(state); },
     reportDictationEvent(event) {
       events.push(event);
@@ -414,4 +415,29 @@ test("correção antiga concluída depois de ditado novo não substitui o cartã
   await savePending;
   assert.equal(renderer.element("#lastMessageText").value, "Texto novo");
   assert.equal(renderer.events.some((event) => event.type === "completed"), true);
+});
+
+// A cápsula só avisa "Ctrl+V" quando o texto ficou apenas na área de
+// transferência; um ditado colado de fato mantém o pulso normal, e o aviso
+// não vaza para o estado seguinte.
+test("sucesso publica o aviso de colagem manual só quando não colou", async () => {
+  for (const [autoPasted, manualPaste] of [[false, true], [true, false]]) {
+    const renderer = createRenderer({
+      transcribe: async () => ({ text: "Oi", autoPasted, reason: autoPasted ? null : "target-focus-lost" }),
+    });
+    await renderer.element("#recordButton").dispatch("click");
+    addVoicedAudio(renderer);
+    renderer.close.resolve();
+    await renderer.element("#stopButton").dispatch("click");
+    const last = renderer.uiStates.at(-1);
+    assert.equal(last.state, "success");
+    assert.equal(last.manualPaste, manualPaste);
+
+    // Republicar o mesmo sucesso (ex.: trocar o perfil) não repete o aviso.
+    await renderer.element("#profileSelect").dispatch("change");
+    assert.equal(renderer.uiStates.at(-1).manualPaste, false);
+
+    await renderer.element("#recordButton").dispatch("click");
+    assert.equal(renderer.uiStates.at(-1).manualPaste, false);
+  }
 });

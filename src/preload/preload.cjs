@@ -57,6 +57,13 @@ contextBridge.exposeInMainWorld("localFlow", {
   updateUiState: (state) => ipcRenderer.send("ui:update-state", state),
   getUiState: () => ipcRenderer.invoke("ui:get-state"),
   capsuleAction: (action) => ipcRenderer.invoke("capsule:action", action),
+  capsuleHover: (hovering) =>
+    ipcRenderer.send("capsule:hover", Boolean(hovering)),
+  onNavigate: (listener) => {
+    const handler = (_event, page) => listener(page);
+    ipcRenderer.on("app:navigate", handler);
+    return () => ipcRenderer.removeListener("app:navigate", handler);
+  },
   onUiState: (listener) => {
     const handler = (_event, state) => listener(state);
     ipcRenderer.on("ui:state", handler);

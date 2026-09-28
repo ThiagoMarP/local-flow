@@ -23,6 +23,9 @@ function normalizeUiState(payload = {}) {
     message: String(payload.message || "").slice(0, 160),
     elapsedMs: Math.max(0, Number(payload.elapsedMs) || 0),
     level: Math.max(0, Math.min(1, Number(payload.level) || 0)),
+    // The text is only on the clipboard (copied only, or the paste failed), so
+    // the capsule tells the user to press Ctrl+V instead of the plain pulse.
+    manualPaste: payload.manualPaste === true,
   };
 }
 

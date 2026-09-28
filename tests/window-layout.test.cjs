@@ -51,8 +51,24 @@ test("normaliza estado recebido pelo renderer", () => {
       message: "Ouvindo",
       elapsedMs: 0,
       level: 1,
+      manualPaste: false,
     },
   );
+});
+
+// Colou, só copiou e falhou em colar terminavam no mesmo pulso. A cápsula só
+// pode avisar "use Ctrl+V" se o sinal sobreviver à normalização, e só como
+// booleano estrito: qualquer outro valor vindo do renderer vira false.
+test("preserva o aviso de colagem manual só como booleano", () => {
+  assert.equal(
+    normalizeUiState({ state: "success", manualPaste: true }).manualPaste,
+    true,
+  );
+  assert.equal(
+    normalizeUiState({ state: "success", manualPaste: "yes" }).manualPaste,
+    false,
+  );
+  assert.equal(normalizeUiState({ state: "success" }).manualPaste, false);
 });
 
 test("descarta estado e perfil desconhecidos", () => {
@@ -127,11 +143,11 @@ test("cápsula acompanha o monitor do cursor sem mover ou ativar a janela a cada
   };
   try {
     manager.positionCapsule();
-    assert.deepEqual(positions.at(-1), { x: 1196, y: 2, width: 168, height: 78 });
+    assert.deepEqual(positions.at(-1), { x: 1156, y: 2, width: 248, height: 78 });
 
     manager.applyUiState({ state: "recording", source: "dictation" });
     assert.ok(manager.capsuleCursorPoll);
-    assert.deepEqual(positions.at(-1), { x: 3196, y: -232, width: 168, height: 78 });
+    assert.deepEqual(positions.at(-1), { x: 3156, y: -232, width: 248, height: 78 });
 
     const count = positions.length;
     const showCount = shows;
@@ -144,31 +160,31 @@ test("cápsula acompanha o monitor do cursor sem mover ou ativar a janela a cada
 
     cursor = { x: 200, y: 100 };
     manager.positionCapsule();
-    assert.deepEqual(positions.at(-1), { x: 1196, y: 2, width: 168, height: 78 });
+    assert.deepEqual(positions.at(-1), { x: 1156, y: 2, width: 248, height: 78 });
 
     manager.applyUiState({ state: "success", source: "dictation" });
     assert.equal(manager.capsuleCursorPoll, null);
     cursor = { x: 3000, y: 100 };
     manager.positionCapsule();
-    assert.deepEqual(positions.at(-1), { x: 1196, y: 2, width: 168, height: 78 });
+    assert.deepEqual(positions.at(-1), { x: 1156, y: 2, width: 248, height: 78 });
 
     manager.applyUiState({ state: "meeting" });
     assert.ok(manager.capsuleCursorPoll);
-    assert.deepEqual(positions.at(-1), { x: 3196, y: -232, width: 168, height: 78 });
+    assert.deepEqual(positions.at(-1), { x: 3156, y: -232, width: 248, height: 78 });
     manager.applyUiState({ state: "processing" });
     assert.ok(manager.capsuleCursorPoll);
     displays = [primary];
     manager.positionCapsule({ force: true });
-    assert.deepEqual(positions.at(-1), { x: 1196, y: 2, width: 168, height: 78 });
+    assert.deepEqual(positions.at(-1), { x: 1156, y: 2, width: 248, height: 78 });
     displays = [primary, secondary];
     manager.positionCapsule();
-    assert.deepEqual(positions.at(-1), { x: 3196, y: -232, width: 168, height: 78 });
+    assert.deepEqual(positions.at(-1), { x: 3156, y: -232, width: 248, height: 78 });
 
     manager.applyUiState({ state: "idle" });
     assert.equal(manager.capsuleCursorPoll, null);
     displays = [primary];
     manager.positionCapsule({ force: true });
-    assert.deepEqual(positions.at(-1), { x: 1196, y: 2, width: 168, height: 78 });
+    assert.deepEqual(positions.at(-1), { x: 1156, y: 2, width: 248, height: 78 });
   } finally {
     manager.beginQuit();
   }
@@ -207,12 +223,128 @@ test("recriação da cápsula reposiciona a nova janela mesmo com bounds iguais"
   });
   manager.createCapsule();
   const oldWindow = manager.capsuleWindow;
-  assert.deepEqual(oldWindow.positions, [{ x: -804, y: -198, width: 168, height: 78 }]);
+  assert.deepEqual(oldWindow.positions, [{ x: -844, y: -198, width: 248, height: 78 }]);
   manager.createCapsule();
   const replacement = manager.capsuleWindow;
   assert.notEqual(oldWindow, replacement);
   assert.deepEqual(replacement.positions, oldWindow.positions);
   oldWindow.events.get("closed")();
   assert.equal(manager.capsuleWindow, replacement);
+  manager.beginQuit();
+});
+
+function fakeCapsuleManager() {
+  const display = { id: 1, workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
+  const screen = {
+    getAllDisplays: () => [display],
+    getPrimaryDisplay: () => display,
+  };
+  const mouse = [];
+  const sent = [];
+  const capsule = {
+    isDestroyed: () => false,
+    setBounds: () => {},
+    setIgnoreMouseEvents: (ignore, options) =>
+      mouse.push(options?.forward ? "forward" : ignore ? "ignore" : "accept"),
+    showInactive: () => {},
+    webContents: { send: (_channel, state) => sent.push(state.state) },
+  };
+  const manager = new WindowManager({ displayScreen: screen });
+  manager.capsuleWindow = capsule;
+  return { manager, mouse, sent };
+}
+
+// Colou de fato: o pulso curto basta e a cápsula nunca intercepta cliques.
+test("sucesso com colagem some rápido e continua transparente ao mouse", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { manager, mouse, sent } = fakeCapsuleManager();
+  manager.applyUiState({ state: "success" });
+  assert.equal(mouse.at(-1), "ignore");
+  manager.setCapsuleHover(true);
+  assert.equal(mouse.at(-1), "ignore");
+  t.mock.timers.tick(700);
+  assert.equal(sent.at(-1), "idle");
+  manager.beginQuit();
+});
+
+// Só copiou ou a colagem falhou: o aviso "Ctrl+V" fica tempo suficiente para
+// ser lido e passa a aceitar o mouse só quando o cursor está sobre a pílula.
+test("aviso de Ctrl+V dura mais e pausa enquanto o mouse está em cima", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { manager, mouse, sent } = fakeCapsuleManager();
+  manager.applyUiState({ state: "success", manualPaste: true });
+  assert.equal(mouse.at(-1), "forward");
+  t.mock.timers.tick(1000);
+  assert.equal(sent.at(-1), "success");
+
+  manager.setCapsuleHover(true);
+  assert.equal(mouse.at(-1), "accept");
+  t.mock.timers.tick(10_000);
+  assert.equal(sent.at(-1), "success");
+
+  manager.setCapsuleHover(false);
+  assert.equal(mouse.at(-1), "forward");
+  t.mock.timers.tick(1199);
+  assert.equal(sent.at(-1), "success");
+  t.mock.timers.tick(1);
+  assert.equal(sent.at(-1), "idle");
+  assert.equal(mouse.at(-1), "ignore");
+  manager.beginQuit();
+});
+
+test("erro fica visível para leitura e não some com o mouse em cima", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { manager, mouse, sent } = fakeCapsuleManager();
+  manager.applyUiState({ state: "error", message: "Nenhum áudio foi capturado." });
+  assert.equal(mouse.at(-1), "forward");
+  t.mock.timers.tick(3000);
+  assert.equal(sent.at(-1), "error");
+  manager.setCapsuleHover(true);
+  t.mock.timers.tick(60_000);
+  assert.equal(sent.at(-1), "error");
+  manager.setCapsuleHover(false);
+  t.mock.timers.tick(1200);
+  assert.equal(sent.at(-1), "idle");
+  manager.beginQuit();
+});
+
+// Um estado novo (outro ditado começando) não pode herdar a pausa do anterior,
+// e o mouse saindo depois não pode agendar o sumiço do estado novo.
+test("estado novo descarta a pausa do mouse", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { manager, mouse, sent } = fakeCapsuleManager();
+  manager.applyUiState({ state: "error", message: "boom" });
+  manager.setCapsuleHover(true);
+  manager.applyUiState({ state: "recording" });
+  assert.equal(mouse.at(-1), "ignore");
+  manager.setCapsuleHover(false);
+  assert.equal(mouse.at(-1), "ignore");
+  t.mock.timers.tick(10_000);
+  assert.equal(sent.at(-1), "recording");
+  manager.beginQuit();
+});
+
+test("sem auto-hide, sair com o mouse não agenda o sumiço", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { manager, sent } = fakeCapsuleManager();
+  manager.applyUiState({ state: "error", message: "boom" }, { autoHide: false });
+  manager.setCapsuleHover(true);
+  manager.setCapsuleHover(false);
+  t.mock.timers.tick(60_000);
+  assert.equal(sent.at(-1), "error");
+  manager.beginQuit();
+});
+
+// Um mouseleave sem mouseenter anterior (hover velho do Chromium) não pode
+// encurtar o tempo de leitura do erro.
+test("saída do mouse sem entrada não encurta o tempo do aviso", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { manager, sent } = fakeCapsuleManager();
+  manager.applyUiState({ state: "error", message: "boom" });
+  manager.setCapsuleHover(false);
+  t.mock.timers.tick(3000);
+  assert.equal(sent.at(-1), "error");
+  t.mock.timers.tick(1000);
+  assert.equal(sent.at(-1), "idle");
   manager.beginQuit();
 });

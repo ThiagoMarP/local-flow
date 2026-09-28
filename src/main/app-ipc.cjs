@@ -125,11 +125,19 @@ function registerAppIpc({
 
   ipcMain.handle("ui:get-state", () => windowManager.currentUiState);
   ipcMain.handle("capsule:action", (_event, action) => {
+    const message = windowManager.currentUiState.message;
     windowManager.dismissCapsule();
+    // Clicking an error opens the page that shows its full message.
+    if (action === "open") {
+      windowManager.openDashboardPage(/reunião/i.test(message) ? "meetings" : "home");
+    }
     logger.info("capsule_dismissed", {
-      action: action === "discard" ? "discard" : "confirm",
+      action: ["discard", "open"].includes(action) ? action : "confirm",
     });
     return true;
+  });
+  ipcMain.on("capsule:hover", (_event, hovering) => {
+    windowManager.setCapsuleHover(hovering === true);
   });
   ipcMain.handle("app:show-dashboard", () => {
     windowManager.showDashboard();

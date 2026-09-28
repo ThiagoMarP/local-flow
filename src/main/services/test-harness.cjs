@@ -249,20 +249,27 @@ class TestHarness {
   async onCapsuleReady(window, applyUiState) {
     console.log("LOCAL_FLOW_CAPSULE_READY");
     if (!process.env.LOCAL_FLOW_CAPTURE_CAPSULE_PATH) return;
-    const state = process.env.LOCAL_FLOW_CAPSULE_STATE || "recording";
+    // The dashboard publishes its own "ready" state once it boots; let it
+    // settle first so it does not overwrite the state being captured.
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    const requested = process.env.LOCAL_FLOW_CAPSULE_STATE || "recording";
+    // "copied" is the success state whose text waits for a manual Ctrl+V.
+    const state = requested === "copied" ? "success" : requested;
     applyUiState(
       {
         state,
         message:
+          process.env.LOCAL_FLOW_CAPSULE_MESSAGE ||
           {
             recording: "Ouvindo…",
             processing: "Transcrevendo…",
             success: "Texto copiado",
-            error: "Não foi possível transcrever",
+            error: "Não foi possível acessar o microfone: Nenhum microfone foi encontrado pelo Windows.",
           }[state] || "Local Flow",
         profile: "standard",
         elapsedMs: state === "recording" ? 8400 : 0,
         level: 0.72,
+        manualPaste: requested === "copied",
       },
       { autoHide: false },
     );

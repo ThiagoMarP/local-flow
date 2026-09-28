@@ -1,6 +1,12 @@
-// Global dictation and meeting shortcuts. Electron's globalShortcut only offers
-// unregisterAll() cheaply, so re-registering dictation also re-registers the
-// meeting shortcut.
+// Pastes the last transcription again. Fixed for now: Ctrl+Alt is free of the
+// dictation and browser combos, and the paste helper waits for these modifiers
+// to be released before it sends its own Ctrl+V.
+const REPASTE_SHORTCUT = "CommandOrControl+Alt+V";
+const REPASTE_SHORTCUT_DISPLAY = "Ctrl+Alt+V";
+
+// Global dictation, meeting and repaste shortcuts. Electron's globalShortcut
+// only offers unregisterAll() cheaply, so re-registering dictation also
+// re-registers the other two.
 class ShortcutRegistry {
   constructor({
     app,
@@ -9,6 +15,7 @@ class ShortcutRegistry {
     windowManager,
     onDictation,
     onMeeting,
+    onRepaste,
     disableEscape,
     syncEscape,
   }) {
@@ -18,12 +25,14 @@ class ShortcutRegistry {
     this.windowManager = windowManager;
     this.onDictation = onDictation;
     this.onMeeting = onMeeting;
+    this.onRepaste = onRepaste;
     this.disableEscape = disableEscape;
     this.syncEscape = syncEscape;
     this.activeShortcut = "CommandOrControl+Shift+Space";
     this.activeMeetingShortcut = "CommandOrControl+Alt+R";
     this.registered = false;
     this.registrationError = "";
+    this.repasteRegistered = false;
   }
 
   format(accelerator) {
@@ -38,6 +47,18 @@ class ShortcutRegistry {
   registerMeeting(shortcut = this.settingsStore.get().meetingShortcut) {
     this.activeMeetingShortcut = shortcut;
     this.globalShortcut.register(shortcut, () => this.onMeeting());
+  }
+
+  registerRepaste() {
+    if (!this.onRepaste) return;
+    this.repasteRegistered = this.globalShortcut.register(
+      REPASTE_SHORTCUT,
+      () => this.onRepaste(),
+    );
+    this.windowManager?.setRepasteStatus?.({
+      registered: this.repasteRegistered,
+      display: REPASTE_SHORTCUT_DISPLAY,
+    });
   }
 
   replaceMeeting(shortcut) {
@@ -60,8 +81,9 @@ class ShortcutRegistry {
       registered: this.registered,
       display: this.format(this.activeShortcut),
     });
-    // unregisterAll() above removed the meeting shortcut too.
+    // unregisterAll() above removed the meeting and repaste shortcuts too.
     this.registerMeeting();
+    this.registerRepaste();
     this.syncEscape();
     console.log(
       `LOCAL_FLOW_SHORTCUT_READY=${JSON.stringify({
@@ -90,8 +112,13 @@ class ShortcutRegistry {
       mode: "toggle",
       registered: this.registered,
       error: this.registrationError,
+      repaste: {
+        accelerator: REPASTE_SHORTCUT,
+        display: REPASTE_SHORTCUT_DISPLAY,
+        registered: this.repasteRegistered,
+      },
     };
   }
 }
 
-module.exports = { ShortcutRegistry };
+module.exports = { REPASTE_SHORTCUT, ShortcutRegistry };

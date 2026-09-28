@@ -184,6 +184,10 @@ let activeRunId = null;
 let transcriptionStarted = false;
 let cancelRequestPending = false;
 let deliveryCommitted = false;
+// The last dictation left its text only on the clipboard (copied only, or the
+// paste failed). One-shot: only the publish that announces the success carries
+// it, so a later republish (e.g. a profile change) does not replay the notice.
+let deliveryNeedsManualPaste = false;
 
 function reportDictationEvent(event) {
   window.localFlow.reportDictationEvent({ runId: activeRunId, ...event });
@@ -231,6 +235,8 @@ function isBusyState(value) {
 }
 
 function publishUiState(overrides = {}) {
+  const manualPaste = state === "success" && deliveryNeedsManualPaste;
+  deliveryNeedsManualPaste = false;
   // Main tracks dictation independently and preserves the meeting capsule
   // while a meeting is being captured.
   window.localFlow.updateUiState({
@@ -242,6 +248,7 @@ function publishUiState(overrides = {}) {
     elapsedMs:
       state === "recording" ? Date.now() - recordingStartedAt : 0,
     level: 0,
+    manualPaste,
     ...overrides,
   });
 }
@@ -687,6 +694,7 @@ async function stopAndTranscribe(source = recordingSource) {
         ? `${deliveryNote} Revisão não aplicada; texto original mantido.`
         : deliveryNote,
     );
+    deliveryNeedsManualPaste = !result.autoPasted;
     setStatus(
       "success",
       deliveryMessage,
@@ -1054,6 +1062,9 @@ function showPage(name) {
 for (const item of navItems) {
   item.addEventListener("click", () => showPage(item.dataset.page));
 }
+window.localFlow.onNavigate((page) => {
+  if (navItems.some((item) => item.dataset.page === page)) showPage(page);
+});
 
 function selectedShortcutLabel(select) {
   return select.selectedOptions[0]?.textContent || "indisponível";
