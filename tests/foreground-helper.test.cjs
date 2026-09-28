@@ -12,7 +12,7 @@ const helperPath = path.join(
 );
 
 test("paste focus path does not activate the target window menu", () => {
-  const source = readFileSync(helperPath, "utf8");
+  const source = readFileSync(helperPath, "utf8").replace(/\r\n/g, "\n");
   const focusBody = source.match(
     /public static bool FocusWindow\(IntPtr target\) \{([\s\S]*?)\n    \}\n\n    public static void SendPaste/s,
   )?.[1];
