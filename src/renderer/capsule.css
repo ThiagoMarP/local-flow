@@ -42,7 +42,7 @@ body {
   justify-content: center;
   width: fit-content;
   min-width: 36px;
-  max-width: 230px;
+  max-width: 240px;
   height: 34px;
   padding: 3px 9px;
   border: 1px solid #ffffff1f;
@@ -209,7 +209,6 @@ body {
   align-items: center;
 }
 
-/* In success/error this bordered circle IS the whole badge (no outer pill). */
 .act {
   width: 32px;
   height: 32px;
@@ -329,24 +328,137 @@ body {
   animation: beat 440ms ease forwards;
 }
 
-/* Error keeps the bordered-circle badge (an X to dismiss the failure). */
-.capsule[data-state="error"] .actions {
-  display: flex;
+/* Notices: the two outcomes worth reading. A dictation that ended with its
+   text only on the clipboard shows a clipboard glyph and a "Ctrl+V" keycap in
+   place of the success beat; an error shows a short phrase naming what broke,
+   plus an X to dismiss it. Both stay while the cursor rests on them. */
+.notice {
+  display: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 7px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  animation: notice-in 160ms ease both;
 }
-.capsule[data-state="error"] .body {
+.notice-icon {
+  display: none;
+  flex: 0 0 auto;
+}
+.notice-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.capsule[data-state="error"] .notice,
+.capsule[data-state="success"][data-manual-paste="true"] .notice {
+  display: inline-flex;
+}
+.capsule[data-state="error"],
+.capsule[data-state="success"][data-manual-paste="true"] {
+  cursor: pointer;
+}
+
+.capsule[data-state="success"][data-manual-paste="true"] {
+  padding-right: 10px;
+  padding-left: 12px;
+}
+.capsule[data-state="success"][data-manual-paste="true"] .wave {
   display: none;
 }
+.capsule[data-state="success"][data-manual-paste="true"] .notice-icon.clip {
+  display: block;
+}
+.capsule[data-state="success"][data-manual-paste="true"] .notice-text {
+  padding: 4px 6px 3px;
+  border: 1px solid #ffffff47;
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+}
+
+.capsule[data-state="error"] {
+  gap: 6px;
+  padding-right: 5px;
+  padding-left: 11px;
+}
+.capsule[data-state="error"] .body,
 .capsule[data-state="error"] .confirm {
   display: none;
 }
-
-/* Strip the outer pill so only the bordered circle remains — error only. */
-.capsule[data-state="error"] {
-  min-width: 0;
-  padding: 0;
+/* The one warm accent on the monochrome pill, like the meeting REC dot. */
+.capsule[data-state="error"] .notice-icon.alert {
+  display: block;
+  color: #ff6b61;
+}
+.capsule[data-state="error"] .actions {
+  display: flex;
+}
+.capsule[data-state="error"] .discard {
+  width: 22px;
+  height: 22px;
   border-color: transparent;
   background: transparent;
   box-shadow: none;
+  opacity: 0.7;
+}
+.capsule[data-state="error"] .discard:hover {
+  background: #ffffff1f;
+  opacity: 1;
+}
+.capsule[data-state="error"]:hover,
+.capsule[data-state="success"][data-manual-paste="true"]:hover {
+  border-color: #ffffff38;
+  background: rgba(22, 22, 26, 0.9);
+}
+
+/* Recording hints. "Esc cancela" is quiet; the silent mic and the last
+   seconds before the duration limit use amber, dimming or tinting the bars so
+   the warning reads even at a glance. */
+.hint {
+  display: none;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  animation: notice-in 160ms ease both;
+}
+.capsule[data-state="recording"]:not([data-hint=""]) .hint {
+  display: inline-flex;
+}
+.capsule[data-hint="esc"] .hint {
+  color: #ffffffa8;
+}
+.capsule[data-hint="silent"] .hint,
+.capsule[data-hint="countdown"] .hint {
+  color: #f6b94a;
+}
+.capsule[data-hint="countdown"] .hint {
+  min-width: 26px;
+  font-variant-numeric: tabular-nums;
+}
+.capsule[data-hint="silent"] .wave {
+  opacity: 0.35;
+}
+.capsule[data-hint="countdown"] .wave i {
+  background: #f6b94a;
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes eq {

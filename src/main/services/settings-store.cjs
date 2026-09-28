@@ -40,12 +40,24 @@ const ALLOWED_MEETING_SHORTCUTS = new Map([
   ["CommandOrControl+Alt+L", "Ctrl+Alt+L"],
 ]);
 
+// Global "paste the last transcription again". Every option is Ctrl+Alt+… so
+// none overlaps the dictation or meeting lists; "off" frees the combo for an
+// app that needs it (Word's Paste Special, JetBrains' Extract Variable).
+const REPASTE_SHORTCUT_OFF = "off";
+const ALLOWED_REPASTE_SHORTCUTS = new Map([
+  ["CommandOrControl+Alt+V", "Ctrl+Alt+V"],
+  ["CommandOrControl+Alt+B", "Ctrl+Alt+B"],
+  ["CommandOrControl+Alt+Shift+V", "Ctrl+Alt+Shift+V"],
+  [REPASTE_SHORTCUT_OFF, "Desativado"],
+]);
+
 const DEFAULT_SETTINGS = Object.freeze({
   version: SETTINGS_VERSION,
   profile: "standard",
   vocabulary: ["Electron", "TypeScript", "Whisper", "Ollama"],
   shortcut: "CommandOrControl+Shift+Space",
   meetingShortcut: "CommandOrControl+Alt+R",
+  repasteShortcut: "CommandOrControl+Alt+V",
   meetingCaptureMode: "both",
   // Reunião tem modelo próprio (independente do ditado): whisper rápido por
   // padrão (prioriza velocidade) e o LLM do resumo separado.
@@ -91,6 +103,9 @@ function normalizeSettings(value = {}) {
   const meetingShortcut = ALLOWED_MEETING_SHORTCUTS.has(value.meetingShortcut)
     ? value.meetingShortcut
     : DEFAULT_SETTINGS.meetingShortcut;
+  const repasteShortcut = ALLOWED_REPASTE_SHORTCUTS.has(value.repasteShortcut)
+    ? value.repasteShortcut
+    : DEFAULT_SETTINGS.repasteShortcut;
   const meetingCaptureMode = ALLOWED_MEETING_CAPTURE_MODES.has(
     value.meetingCaptureMode,
   )
@@ -116,6 +131,7 @@ function normalizeSettings(value = {}) {
     vocabulary: normalizeVocabulary(value.vocabulary),
     shortcut,
     meetingShortcut,
+    repasteShortcut,
     meetingCaptureMode,
     meetingProfile,
     meetingSummaryModel: normalizeModel(
@@ -185,6 +201,12 @@ function publicSettings(settings) {
       ALLOWED_MEETING_SHORTCUTS.get(settings.meetingShortcut) ||
       ALLOWED_MEETING_SHORTCUTS.get(DEFAULT_SETTINGS.meetingShortcut),
     allowedMeetingShortcuts: [...ALLOWED_MEETING_SHORTCUTS.entries()].map(
+      ([value, label]) => ({ value, label }),
+    ),
+    repasteShortcutDisplay:
+      ALLOWED_REPASTE_SHORTCUTS.get(settings.repasteShortcut) ||
+      ALLOWED_REPASTE_SHORTCUTS.get(DEFAULT_SETTINGS.repasteShortcut),
+    allowedRepasteShortcuts: [...ALLOWED_REPASTE_SHORTCUTS.entries()].map(
       ([value, label]) => ({ value, label }),
     ),
     allowedMeetingCaptureModes: [
@@ -268,6 +290,8 @@ module.exports = {
   ALLOWED_SHORTCUTS,
   ALLOWED_MEETING_SHORTCUTS,
   ALLOWED_MEETING_CAPTURE_MODES,
+  ALLOWED_REPASTE_SHORTCUTS,
+  REPASTE_SHORTCUT_OFF,
   DEFAULT_SETTINGS,
   SettingsStore,
   normalizeSettings,

@@ -76,6 +76,16 @@ function registerAppIpc({
     ) {
       throw new Error(`${shortcuts.format(desiredShortcut)} já está em uso.`);
     }
+    const desiredRepaste = patch?.repasteShortcut || previous.repasteShortcut;
+    if (
+      desiredRepaste !== previous.repasteShortcut &&
+      !shortcuts.updateRepaste(desiredRepaste)
+    ) {
+      if (desiredShortcut !== previous.shortcut) {
+        shortcuts.update(previous.shortcut);
+      }
+      throw new Error(`${shortcuts.formatRepaste(desiredRepaste)} já está em uso.`);
+    }
     try {
       const next = await settingsStore.update(patch || {});
       if (next.meetingShortcut !== previous.meetingShortcut) {
@@ -98,6 +108,9 @@ function registerAppIpc({
       if (desiredShortcut !== previous.shortcut) {
         shortcuts.update(previous.shortcut);
       }
+      if (desiredRepaste !== previous.repasteShortcut) {
+        shortcuts.updateRepaste(previous.repasteShortcut);
+      }
       throw error;
     }
   });
@@ -106,6 +119,7 @@ function registerAppIpc({
     const previous = settingsStore.get();
     const defaults = await settingsStore.reset();
     shortcuts.update(defaults.shortcut);
+    shortcuts.updateRepaste(defaults.repasteShortcut);
     setActiveProfile(defaults.profile);
     windowManager.setProfile(getActiveProfile());
     if (previous.launchAtLogin && canManageLoginItem) {
@@ -125,11 +139,19 @@ function registerAppIpc({
 
   ipcMain.handle("ui:get-state", () => windowManager.currentUiState);
   ipcMain.handle("capsule:action", (_event, action) => {
+    const message = windowManager.currentUiState.message;
     windowManager.dismissCapsule();
+    // Clicking an error opens the page that shows its full message.
+    if (action === "open") {
+      windowManager.openDashboardPage(/reunião/i.test(message) ? "meetings" : "home");
+    }
     logger.info("capsule_dismissed", {
-      action: action === "discard" ? "discard" : "confirm",
+      action: ["discard", "open"].includes(action) ? action : "confirm",
     });
     return true;
+  });
+  ipcMain.on("capsule:hover", (_event, hovering) => {
+    windowManager.setCapsuleHover(hovering === true);
   });
   ipcMain.handle("app:show-dashboard", () => {
     windowManager.showDashboard();

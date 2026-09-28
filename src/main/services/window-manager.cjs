@@ -9,6 +9,29 @@ const path = require("node:path");
 const { calculateCapsuleBounds } = require("../window-layout.cjs");
 const { normalizeUiState } = require("../ui-state.cjs");
 
+// Wide enough for a short error phrase. The window is click-through outside
+// the pill, so the extra transparent width costs nothing.
+const CAPSULE_WIDTH = 248;
+const CAPSULE_HEIGHT = 78;
+const SUCCESS_HIDE_MS = 700;
+// Long enough to read "Ctrl+V" or a short error without hovering.
+const MANUAL_PASTE_HIDE_MS = 1600;
+const ERROR_HIDE_MS = 4000;
+const HOVER_EXIT_HIDE_MS = 1200;
+
+function isHoverableCapsuleState(uiState) {
+  return uiState.state === "error" ||
+    (uiState.state === "success" && uiState.manualPaste);
+}
+
+// Concluded states close themselves; every other state (idle included) waits
+// for the next update.
+function capsuleHideDelay(uiState) {
+  if (uiState.state === "error") return ERROR_HIDE_MS;
+  if (uiState.state !== "success") return 0;
+  return uiState.manualPaste ? MANUAL_PASTE_HIDE_MS : SUCCESS_HIDE_MS;
+}
+
 class WindowManager {
   constructor({
     projectRoot,
@@ -42,12 +65,16 @@ class WindowManager {
     this.followCursorDisplay = false;
     this.capsuleDisplayId = null;
     this.lastCapsuleBounds = null;
+    this.capsuleHoverable = false;
+    this.capsuleHovered = false;
+    this.capsuleAutoHide = true;
     this.activeProfile = "standard";
     this.shortcut = {
       registered: false,
       display: "Ctrl+Shift+Espaço",
     };
     this.hotkeyStatus = { enabled: true, ready: false, display: "Ctrl + Win" };
+    this.repasteStatus = { registered: false, disabled: false, display: "Ctrl+Alt+V" };
     this.currentUiState = normalizeUiState({
       state: "idle",
       message: "Pronto",
@@ -175,8 +202,8 @@ class WindowManager {
 
   createCapsule() {
     this.capsuleWindow = new this.BrowserWindowClass({
-      width: 168,
-      height: 78,
+      width: CAPSULE_WIDTH,
+      height: CAPSULE_HEIGHT,
       frame: false,
       transparent: true,
       backgroundColor: "#00000000",
@@ -286,6 +313,14 @@ class WindowManager {
             : "Atalho alternativo indisponível",
           enabled: false,
         },
+        {
+          label: this.repasteStatus.disabled
+            ? "Colar última: desativado"
+            : this.repasteStatus.registered
+              ? `Colar última: ${this.repasteStatus.display}`
+              : `Colar última: ${this.repasteStatus.display} indisponível`,
+          enabled: false,
+        },
         { type: "separator" },
         {
           label: "Sair",
@@ -305,6 +340,11 @@ class WindowManager {
 
   setHotkeyStatus(status) {
     this.hotkeyStatus = { ...this.hotkeyStatus, ...status };
+    this.rebuildTrayMenu();
+  }
+
+  setRepasteStatus(status) {
+    this.repasteStatus = { ...this.repasteStatus, ...status };
     this.rebuildTrayMenu();
   }
 
@@ -348,8 +388,8 @@ class WindowManager {
     const display = this.findCapsuleDisplay();
     if (!display?.workArea) return;
     const bounds = calculateCapsuleBounds(display.workArea, {
-      width: 168,
-      height: 78,
+      width: CAPSULE_WIDTH,
+      height: CAPSULE_HEIGHT,
       margin: 2,
       anchor: "top",
     });
@@ -417,6 +457,14 @@ class WindowManager {
     this.rebuildTrayMenu();
   }
 
+  // Opens the dashboard on a given page (e.g. where a capsule error's full
+  // message is shown).
+  openDashboardPage(page) {
+    const existed = Boolean(this.dashboardWindow && !this.dashboardWindow.isDestroyed());
+    this.showDashboard();
+    if (existed) this.dashboardWindow.webContents.send("app:navigate", page);
+  }
+
   hideDashboard() {
     this.dashboardWindow?.hide();
     this.rebuildTrayMenu();
@@ -437,41 +485,63 @@ class WindowManager {
     }
 
     clearTimeout(this.capsuleHideTimer);
+    this.capsuleHovered = false;
     this.capsuleWindow.webContents.send(
       "ui:state",
       this.currentUiState,
     );
-    if (this.currentUiState.state === "idle") {
-      // At rest the capsule stays visible as a thin line at the top.
+    // Only states that have something to read or click (an error, or the
+    // "Ctrl+V" notice) react to the mouse. Even then the window stays
+    // click-through: forwarded mouse moves let the capsule report when the
+    // cursor is over the pill itself, and only then does it accept clicks, so
+    // the transparent margin never swallows a click meant for the app below.
+    this.capsuleHoverable = isHoverableCapsuleState(this.currentUiState);
+    this.capsuleAutoHide = options.autoHide !== false;
+    if (this.capsuleHoverable) {
+      this.capsuleWindow.setIgnoreMouseEvents(true, { forward: true });
+    } else {
       this.capsuleWindow.setIgnoreMouseEvents(true);
-      this.positionCapsule();
-      this.capsuleWindow.showInactive();
-      return;
     }
-    // The concluded states expose the discard/confirm buttons, so the capsule
-    // must accept clicks then; every other state stays click-through.
-    const interactive = ["success", "error"].includes(
-      this.currentUiState.state,
-    );
-    this.capsuleWindow.setIgnoreMouseEvents(!interactive);
     this.positionCapsule();
     this.capsuleWindow.showInactive();
 
-    if (options.autoHide !== false && interactive) {
-      const stateAtSchedule = this.currentUiState.state;
-      this.capsuleHideTimer = setTimeout(
-        () => {
-          if (this.currentUiState.state === stateAtSchedule) {
-            this.dismissCapsule();
-          }
-        },
-        this.currentUiState.state === "success" ? 700 : 2200,
-      );
+    const hideAfterMs = capsuleHideDelay(this.currentUiState);
+    if (this.capsuleAutoHide && hideAfterMs) {
+      this.scheduleCapsuleHide(hideAfterMs);
     }
+  }
+
+  scheduleCapsuleHide(delayMs) {
+    clearTimeout(this.capsuleHideTimer);
+    const stateAtSchedule = this.currentUiState;
+    this.capsuleHideTimer = setTimeout(() => {
+      if (this.currentUiState === stateAtSchedule) this.dismissCapsule();
+    }, delayMs);
+  }
+
+  // Reported by the capsule renderer. While the cursor rests on an error or
+  // the Ctrl+V notice it stays up; leaving gives a short grace period.
+  setCapsuleHover(hovering) {
+    if (!this.capsuleHoverable) return;
+    if (!this.capsuleWindow || this.capsuleWindow.isDestroyed()) return;
+    if (hovering) {
+      this.capsuleHovered = true;
+      clearTimeout(this.capsuleHideTimer);
+      this.capsuleWindow.setIgnoreMouseEvents(false);
+      return;
+    }
+    // A leave without a matching enter (stale renderer hover) must not cut
+    // the reading time short.
+    if (!this.capsuleHovered) return;
+    this.capsuleHovered = false;
+    this.capsuleWindow.setIgnoreMouseEvents(true, { forward: true });
+    if (this.capsuleAutoHide) this.scheduleCapsuleHide(HOVER_EXIT_HIDE_MS);
   }
 
   dismissCapsule() {
     clearTimeout(this.capsuleHideTimer);
+    this.capsuleHoverable = false;
+    this.capsuleHovered = false;
     this.currentUiState = normalizeUiState({
       state: "idle",
       message: "Pronto",

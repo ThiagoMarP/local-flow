@@ -7,6 +7,7 @@ import {
   stopMeetingCapture,
 } from "./meeting-recorder.js";
 import { createMeetingsController } from "./meetings-controller.js";
+import { recordingHint } from "./recording-hint.js";
 
 const recordButton = document.querySelector("#recordButton");
 const stopButton = document.querySelector("#stopButton");
@@ -50,6 +51,9 @@ const microphoneSelect = document.querySelector("#microphoneSelect");
 const shortcutSelect = document.querySelector("#shortcutSelect");
 const meetingShortcutSelect = document.querySelector(
   "#meetingShortcutSelect",
+);
+const repasteShortcutSelect = document.querySelector(
+  "#repasteShortcutSelect",
 );
 const meetingCaptureModeSelect = document.querySelector(
   "#meetingCaptureModeSelect",
@@ -96,6 +100,7 @@ const settingsController = createSettingsController({
   microphoneSelect,
   shortcutSelect,
   meetingShortcutSelect,
+  repasteShortcutSelect,
   meetingCaptureModeSelect,
   meetingProfileSelect,
   meetingSummaryModelSelect,
@@ -184,6 +189,29 @@ let activeRunId = null;
 let transcriptionStarted = false;
 let cancelRequestPending = false;
 let deliveryCommitted = false;
+// The last dictation left its text only on the clipboard (copied only, or the
+// paste failed). One-shot: only the publish that announces the success carries
+// it, so a later republish (e.g. a profile change) does not replay the notice.
+let deliveryNeedsManualPaste = false;
+// Last microphone level, so the 250 ms timer publish does not drop the capsule
+// bars to zero between level samples.
+let currentLevel = 0;
+let showEscHint = false;
+const ESC_HINT_KEY = "localFlow.escHintsShown";
+const ESC_HINT_RECORDINGS = 20;
+
+// "Esc cancela" is taught on the first recordings only; after that it would be
+// noise. A per-install convenience, so storage failures just skip the hint.
+function takeEscHint() {
+  try {
+    const shown = Number(window.localStorage.getItem(ESC_HINT_KEY)) || 0;
+    if (shown >= ESC_HINT_RECORDINGS) return false;
+    window.localStorage.setItem(ESC_HINT_KEY, String(shown + 1));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function reportDictationEvent(event) {
   window.localFlow.reportDictationEvent({ runId: activeRunId, ...event });
@@ -231,19 +259,31 @@ function isBusyState(value) {
 }
 
 function publishUiState(overrides = {}) {
-  // Main tracks dictation independently and preserves the meeting capsule
-  // while a meeting is being captured.
-  window.localFlow.updateUiState({
+  const manualPaste = state === "success" && deliveryNeedsManualPaste;
+  deliveryNeedsManualPaste = false;
+  const recording = state === "recording";
+  const payload = {
     source: "dictation",
     state: capsuleState(state),
     message: statusElement.textContent,
     profile: profileSelect.value,
     runId: activeRunId,
-    elapsedMs:
-      state === "recording" ? Date.now() - recordingStartedAt : 0,
-    level: 0,
+    elapsedMs: recording ? Date.now() - recordingStartedAt : 0,
+    level: recording ? currentLevel : 0,
+    manualPaste,
     ...overrides,
-  });
+  };
+  if (recording) {
+    Object.assign(payload, recordingHint({
+      elapsedMs: payload.elapsedMs,
+      limitMs: (settingsController.get()?.maxRecordingSeconds || 0) * 1000,
+      heardSound: maxPeak >= NO_SPEECH_PEAK,
+      showEscHint,
+    }));
+  }
+  // Main tracks dictation independently and preserves the meeting capsule
+  // while a meeting is being captured.
+  window.localFlow.updateUiState(payload);
 }
 
 function setStatus(nextState, message) {
@@ -478,6 +518,7 @@ async function startRecording(source = "manual") {
       // Square-root curve + gain: lifts a normal speaking volume into a lively
       // range instead of only reacting to loud speech, while silence stays low.
       const level = Math.min(1, Math.pow(peak, 0.5) * 2);
+      currentLevel = level;
       meterFill.style.width = `${Math.min(100, 4 + level * 96)}%`;
       const now = Date.now();
       if (now - lastLevelPublish > 80) {
@@ -494,6 +535,8 @@ async function startRecording(source = "manual") {
     silentGain.connect(audioContext.destination);
 
     recordingStartedAt = Date.now();
+    currentLevel = 0;
+    showEscHint = takeEscHint();
     timerElement.textContent = "00:00";
     timerInterval = window.setInterval(updateTimer, 250);
     setStatus("recording", "Ouvindo…");
@@ -687,6 +730,7 @@ async function stopAndTranscribe(source = recordingSource) {
         ? `${deliveryNote} Revisão não aplicada; texto original mantido.`
         : deliveryNote,
     );
+    deliveryNeedsManualPaste = !result.autoPasted;
     setStatus(
       "success",
       deliveryMessage,
@@ -895,7 +939,7 @@ function renderHistory(items) {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "history-empty";
-    empty.textContent = "Nenhuma transcrição ainda.";
+    empty.textContent = "Nenhuma transcrição ainda. Dite com o atalho e o texto aparece aqui.";
     historyList.append(empty);
     historyClearButton.disabled = true;
     return;
@@ -992,12 +1036,21 @@ let historyLoadGeneration = 0;
 function profileLabel(value) {
   return (
     {
-      fast: "Rápido",
-      standard: "Padrão",
-      accurate: "Precisão",
-      parakeet: "Parakeet",
+      fast: "Small",
+      standard: "Medium",
+      accurate: "Large V3 Turbo",
+      parakeet: "Parakeet v3",
     }[value] || "—"
   );
+}
+
+// The dictation model shows by name on Início and is marked "Em uso" on the
+// Modelos page.
+function showActiveModel() {
+  if (statModel) statModel.textContent = profileLabel(profileSelect.value);
+  for (const item of document.querySelectorAll(".model-item")) {
+    item.dataset.active = String(item.dataset.profile === profileSelect.value);
+  }
 }
 
 function renderStats(items) {
@@ -1013,7 +1066,7 @@ function renderStats(items) {
       );
     statWords.textContent = words.toLocaleString("pt-BR");
   }
-  if (statModel) statModel.textContent = profileLabel(profileSelect.value);
+  showActiveModel();
 }
 
 function applyHistoryFilter() {
@@ -1048,12 +1101,24 @@ function showPage(name) {
   for (const page of pages) {
     page.hidden = page.dataset.page !== name;
   }
+  if (name === "models") showActiveModel();
   // Recarrega as reuniões ao abrir a página (uma captura pode ter ocorrido).
   if (name === "meetings") meetingsController.refresh().catch(() => {});
 }
 for (const item of navItems) {
   item.addEventListener("click", () => showPage(item.dataset.page));
 }
+// Section shortcuts at the top of Settings. Buttons, not #anchors: a hash
+// change is a navigation, which main treats as the renderer being interrupted.
+for (const button of document.querySelectorAll(".section-nav [data-section]")) {
+  button.addEventListener("click", () => {
+    document.getElementById(button.dataset.section)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+window.localFlow.onNavigate((page) => {
+  if (navItems.some((item) => item.dataset.page === page)) showPage(page);
+});
 
 function selectedShortcutLabel(select) {
   return select.selectedOptions[0]?.textContent || "indisponível";
@@ -1094,7 +1159,7 @@ historyClearButton.addEventListener("click", async () => {
 });
 profileSelect.addEventListener("change", () => {
   publishUiState();
-  if (statModel) statModel.textContent = profileLabel(profileSelect.value);
+  showActiveModel();
 });
 
 window.addEventListener("beforeunload", () => {
@@ -1300,7 +1365,7 @@ async function initialize() {
     // Settings can restore a profile after the first readiness pass. Apply the
     // model constraints again so an unavailable saved profile is never used.
     applyProfileAvailability(runtime.profiles);
-    if (statModel) statModel.textContent = profileLabel(profileSelect.value);
+    showActiveModel();
     meetingShortcutHint.textContent = selectedShortcutLabel(meetingShortcutSelect);
     syncMeetingModelAvailability();
     const hotkey = runtime.hotkey || {};
