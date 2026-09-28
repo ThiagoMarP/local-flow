@@ -101,6 +101,8 @@ async function transcribeParakeetWav({
   timeoutMs = 120000,
   allowEmpty = false,
   processRunner = runParakeetCli,
+  server,
+  onServerFallback = () => {},
   signal,
 }) {
   throwIfAborted(signal);
@@ -137,6 +139,34 @@ async function transcribeParakeetWav({
   }
   throwIfAborted(signal);
 
+  const finish = (rawText, startedAt) => {
+    const text = stripNonSpeech(rawText);
+    if (!text && !allowEmpty) {
+      throw new Error("O Parakeet não reconheceu fala no áudio.");
+    }
+    return {
+      text,
+      segments: [],
+      profile,
+      durationSeconds: wavInfo.durationSeconds,
+      elapsedMs: Date.now() - startedAt,
+    };
+  };
+
+  if (server?.available) {
+    const startedAt = Date.now();
+    let rawText;
+    try {
+      rawText = await server.transcribe({ wavBuffer, modelPath, timeoutMs, signal });
+    } catch (error) {
+      if (error?.name === "AbortError" || signal?.aborted) throw error;
+      // The warm server is only a speed-up; the CLI below still transcribes.
+      onServerFallback(error);
+    }
+    throwIfAborted(signal);
+    if (rawText !== undefined) return finish(rawText, startedAt);
+  }
+
   const tempRoot = path.join(os.tmpdir(), "local-flow");
   await mkdir(tempRoot, { recursive: true });
   throwIfAborted(signal);
@@ -156,18 +186,7 @@ async function transcribeParakeetWav({
       { cwd: jobDir, timeoutMs, signal },
     );
     throwIfAborted(signal);
-    const text = stripNonSpeech(stdout);
-    if (!text && !allowEmpty) {
-      throw new Error("O Parakeet não reconheceu fala no áudio.");
-    }
-    throwIfAborted(signal);
-    return {
-      text,
-      segments: [],
-      profile,
-      durationSeconds: wavInfo.durationSeconds,
-      elapsedMs: Date.now() - startedAt,
-    };
+    return finish(stdout, startedAt);
   } finally {
     await rm(jobDir, { recursive: true, force: true });
   }

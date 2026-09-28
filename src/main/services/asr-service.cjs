@@ -6,12 +6,19 @@ const { inspectRuntime: inspectWhisperRuntime, transcribeWav } = require("../whi
 
 function createTranscriber({
   parakeetCli,
+  parakeetServer,
+  onParakeetServerFallback,
   whisperTranscribe = transcribeWav,
   parakeetTranscribe = transcribeParakeetWav,
 } = {}) {
   return (options) =>
     options.profile === "parakeet"
-      ? parakeetTranscribe({ ...options, parakeetCli })
+      ? parakeetTranscribe({
+          ...options,
+          parakeetCli,
+          server: parakeetServer,
+          onServerFallback: onParakeetServerFallback,
+        })
       : whisperTranscribe(options);
 }
 

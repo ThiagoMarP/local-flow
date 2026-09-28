@@ -29,7 +29,8 @@ Pra não cair de novo no ciclo manual doloroso de fechar app → buildar → rei
 | ✅ | **Cápsula — fluxo de animação** (sem flash; loading L→R; **pulso de conclusão**) + tons do dashboard unificados à sidebar |
 | ⏸️ | **Auto-update / instalar no app** — travado pelo **Smart App Control** (desligar SAC vs assinar) |
 | ⏸️ | **Parakeet** (velocidade) — travado: binário antigo incompatível com modelo novo + SAC bloqueia binário novo |
-| ⏸️ | **Servidor quente** (`whisper-server`) — **adiado por decisão (30/06/2026):** usuário prioriza economia de RAM e usa só o Small, que já responde rápido. O ganho do hot-server é em modelo grande + recarga repetida, que não é o caso. Reavaliar se migrar pra medium/large no dia a dia. |
+| ✅ | **Servidor quente do Parakeet** (28/09/2026): o Parakeet virou o modelo do dia a dia, então a decisão de junho foi revista. [parakeet-server.cjs](src/main/services/parakeet-server.cjs) sobe o `nemo-speech serve` no primeiro ditado e desliga após 10 min ocioso; se falhar, cai no CLI. Medido nos 10 áudios de `benchmarks/samples`: mediana de 1234 ms para 582 ms, texto idêntico, ~800 MB de RAM enquanto ligado. |
+| ⏸️ | **Servidor quente do Whisper** (`whisper-server`): segue adiado; os perfis Whisper continuam com um processo por ditado. |
 
 > Estamos desenvolvendo via **`npm start`** (funciona sob o SAC); o `npm run deploy` e o auto-update ficam pra quando decidirmos o SAC.
 

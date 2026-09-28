@@ -18,6 +18,7 @@ const { createTranscriber, inspectAsrRuntime } = require("./services/asr-service
 const { cleanOldEntries } = require("./services/housekeeping.cjs");
 const { LoginItemService } = require("./services/login-item-service.cjs");
 const { ModelInstaller } = require("./services/model-installer.cjs");
+const { ParakeetServer } = require("./services/parakeet-server.cjs");
 const { PrivacyLogger } = require("./services/privacy-logger.cjs");
 const { resolvePersonalizationOptions } = require("./services/personalization-service.cjs");
 const { RevisionService } = require("./services/revision-service.cjs");
@@ -131,7 +132,17 @@ crashReporter.start({
 
 // Native binary, helper script and model locations for dev and packaged builds.
 const appPaths = resolveAppPaths({ app, projectRoot });
-const transcribeDictation = createTranscriber({ parakeetCli: appPaths.parakeetCli });
+// Parakeet stays loaded between dictations and unloads itself when idle.
+const parakeetServer = new ParakeetServer({
+  executable: appPaths.parakeetCli,
+  onEvent: (event, metadata) => logger?.info(event, metadata),
+});
+const transcribeDictation = createTranscriber({
+  parakeetCli: appPaths.parakeetCli,
+  parakeetServer,
+  onParakeetServerFallback: (error) =>
+    logger?.warn("parakeet_server_fallback", { reason: error.message }),
+});
 
 const hasSingleInstanceLock = automatedRun
   ? true
@@ -751,6 +762,7 @@ app.on("will-quit", () => {
   globalShortcut.unregisterAll();
   hotkeyTrigger?.listener.dispose();
   windowsBridge?.dispose();
+  parakeetServer.dispose();
   logger?.flush();
 });
 app.on("window-all-closed", () => {

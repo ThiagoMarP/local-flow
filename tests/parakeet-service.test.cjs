@@ -99,3 +99,96 @@ test("cancelar Parakeet encerra o subprocesso em andamento", async () => {
   setTimeout(() => controller.abort(), 50);
   await assert.rejects(running, { name: "AbortError", code: "ABORT_ERR" });
 });
+
+async function withRuntime(run) {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "local-flow-parakeet-test-"));
+  const parakeetCli = path.join(dir, "nemo-speech.exe");
+  await writeFile(parakeetCli, "");
+  await writeFile(path.join(dir, PARAKEET_MODEL_FILE), "");
+  try {
+    await run({ modelsDir: dir, parakeetCli, wavBuffer: oneSecondWav() });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+const cliMustNotRun = () => {
+  throw new Error("CLI não deveria executar");
+};
+
+test("usa o servidor quente quando disponível, sem chamar o CLI", async () => {
+  await withRuntime(async (runtime) => {
+    const calls = [];
+    const result = await transcribeParakeetWav({
+      ...runtime,
+      server: {
+        available: true,
+        transcribe: async (options) => {
+          calls.push(options);
+          return "Olá do servidor.\n";
+        },
+      },
+      processRunner: cliMustNotRun,
+    });
+    assert.equal(result.text, "Olá do servidor.");
+    assert.equal(calls[0].modelPath, path.join(runtime.modelsDir, PARAKEET_MODEL_FILE));
+  });
+});
+
+test("volta ao CLI quando o servidor quente falha", async () => {
+  await withRuntime(async (runtime) => {
+    const fallbacks = [];
+    const result = await transcribeParakeetWav({
+      ...runtime,
+      server: {
+        available: true,
+        transcribe: async () => {
+          throw new Error("HTTP 500");
+        },
+      },
+      onServerFallback: (error) => fallbacks.push(error.message),
+      processRunner: async () => "Olá do CLI.",
+    });
+    assert.equal(result.text, "Olá do CLI.");
+    assert.deepEqual(fallbacks, ["HTTP 500"]);
+  });
+});
+
+test("não recorre ao CLI quando o ditado é cancelado no servidor", async () => {
+  await withRuntime(async (runtime) => {
+    const controller = new AbortController();
+    await assert.rejects(
+      transcribeParakeetWav({
+        ...runtime,
+        signal: controller.signal,
+        server: {
+          available: true,
+          transcribe: async () => {
+            controller.abort();
+            const error = new Error("Ditado cancelado.");
+            error.name = "AbortError";
+            throw error;
+          },
+        },
+        processRunner: cliMustNotRun,
+      }),
+      { name: "AbortError" },
+    );
+  });
+});
+
+test("ignora o servidor quando ele está indisponível", async () => {
+  await withRuntime(async (runtime) => {
+    const result = await transcribeParakeetWav({
+      ...runtime,
+      server: {
+        available: false,
+        transcribe: () => {
+          throw new Error("servidor não deveria executar");
+        },
+      },
+      processRunner: async () => "Olá do CLI.",
+    });
+    assert.equal(result.text, "Olá do CLI.");
+  });
+});
