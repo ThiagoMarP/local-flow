@@ -1,7 +1,7 @@
 const { access, stat } = require("node:fs/promises");
 const path = require("node:path");
 const { MODEL_CATALOG } = require("./model-installer.cjs");
-const { looksLikeEnglishDrift } = require("./language-guard.cjs");
+const { looksLikeLanguageDrift } = require("./language-guard.cjs");
 const { transcribeParakeetWav } = require("./parakeet-service.cjs");
 const {
   getModelPath,
@@ -47,11 +47,12 @@ function createTranscriber({
       server: parakeetServer,
       onServerFallback: onParakeetServerFallback,
     });
-    const { drifted, englishHits, portugueseHits } = looksLikeEnglishDrift(result.text);
+    const { drifted, englishHits, portugueseHits, foreignScript } =
+      looksLikeLanguageDrift(result.text);
     if (!drifted) return result;
 
     const fallbackProfile = await findInstalledWhisperProfile(options, exists);
-    onLanguageFallback({ englishHits, portugueseHits, fallbackProfile });
+    onLanguageFallback({ englishHits, portugueseHits, foreignScript, fallbackProfile });
     if (!fallbackProfile) return result;
     try {
       const retried = await whisperTranscribe({ ...options, profile: fallbackProfile });

@@ -24,6 +24,11 @@ const PORTUGUESE_FUNCTION_WORDS = new Set([
 
 const MIN_ENGLISH_HITS = 3;
 
+// Parakeet also knows Russian, Ukrainian, Bulgarian and Greek. On short
+// dictations it can pick one of them ("e pode seguir" came out as "Ипоти").
+// Portuguese never uses these alphabets, so a single letter is enough.
+const FOREIGN_SCRIPT = /[\p{Script=Cyrillic}\p{Script=Greek}]/u;
+
 function countFunctionWords(text) {
   const words = String(text || "")
     .toLowerCase()
@@ -38,14 +43,17 @@ function countFunctionWords(text) {
   return { englishHits, portugueseHits };
 }
 
-function looksLikeEnglishDrift(text) {
+function looksLikeLanguageDrift(text) {
   const counts = countFunctionWords(text);
+  const foreignScript = FOREIGN_SCRIPT.test(String(text || ""));
   return {
     ...counts,
+    foreignScript,
     drifted:
-      counts.englishHits >= MIN_ENGLISH_HITS &&
-      counts.englishHits > counts.portugueseHits,
+      foreignScript ||
+      (counts.englishHits >= MIN_ENGLISH_HITS &&
+        counts.englishHits > counts.portugueseHits),
   };
 }
 
-module.exports = { countFunctionWords, looksLikeEnglishDrift };
+module.exports = { countFunctionWords, looksLikeLanguageDrift };
