@@ -30,6 +30,8 @@ function normalizeUiState(payload = {}) {
     manualPaste: payload.manualPaste === true,
     hint: VALID_HINTS.has(payload.hint) ? payload.hint : null,
     remainingMs: Math.max(0, Number(payload.remainingMs) || 0),
+    // Locked recording (ends on the next gesture), not a held push-to-talk.
+    locked: payload.locked === true,
   };
 }
 

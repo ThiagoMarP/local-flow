@@ -14,21 +14,21 @@
     <div class="app">
       <aside class="sidebar">
         <nav class="sidebar-nav">
-          <button class="nav-item active" data-page="home" type="button">
+          <button class="nav-item active" data-page="home" type="button" title="Início (Ctrl+1)">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 11l9-7 9 7" />
               <path d="M5 10v10h14V10" />
             </svg>
             Início
           </button>
-          <button class="nav-item" data-page="history" type="button">
+          <button class="nav-item" data-page="history" type="button" title="Histórico (Ctrl+2)">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="8.5" />
               <path d="M12 7.5V12l3 2" />
             </svg>
             Histórico
           </button>
-          <button class="nav-item" data-page="meetings" type="button">
+          <button class="nav-item" data-page="meetings" type="button" title="Reuniões (Ctrl+3)">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="9" cy="8" r="3.1" />
               <path d="M3.6 19a5.4 5.4 0 0 1 10.8 0" />
@@ -37,7 +37,7 @@
             </svg>
             Reuniões
           </button>
-          <button class="nav-item" data-page="settings" type="button">
+          <button class="nav-item" data-page="settings" type="button" title="Configurações (Ctrl+4 ou Ctrl+,)">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <line x1="4" y1="8" x2="20" y2="8" />
               <line x1="4" y1="16" x2="20" y2="16" />
@@ -46,7 +46,7 @@
             </svg>
             Configurações
           </button>
-          <button class="nav-item" data-page="models" type="button">
+          <button class="nav-item" data-page="models" type="button" title="Modelos (Ctrl+5)">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 3l9 5-9 5-9-5 9-5z" />
               <path d="M3 13l9 5 9-5" />
@@ -102,6 +102,9 @@
               <p class="page-summary">
                 <span><strong id="statTotal">0</strong> transcrições</span>
                 <span><strong id="statWords">0</strong> palavras na semana</span>
+                <span title="Estimativa: digitar a 40 palavras por minuto contra falar a 150.">
+                  <strong id="statTimeSaved">0 min</strong> economizados
+                </span>
                 <span>Modelo <strong id="statModel">—</strong></span>
               </p>
             </div>
@@ -194,7 +197,7 @@
               <input
                 id="historySearch"
                 type="search"
-                placeholder="Buscar no histórico"
+                placeholder="Buscar no histórico (Ctrl+F)"
                 aria-label="Buscar no histórico"
                 autocomplete="off"
               />
@@ -244,7 +247,7 @@
               <input
                 id="meetingsSearch"
                 type="search"
-                placeholder="Buscar nas reuniões"
+                placeholder="Buscar nas reuniões (Ctrl+F)"
                 aria-label="Buscar nas reuniões"
                 autocomplete="off"
               />

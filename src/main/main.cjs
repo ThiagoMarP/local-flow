@@ -187,6 +187,7 @@ function createShortcutController() {
         state: "recording",
         message: "Ouvindo…",
         profile: activeProfile,
+        locked: !shortcutController.isHoldGesture(),
       });
       sendDictationCommand("start");
     },
@@ -525,6 +526,11 @@ app.whenReady().then(async () => {
     if (payload?.source === "dictation") {
       dictation.onRendererState(payload);
       if (meetings.ownsCapsule()) return;
+      // Only main knows whether Ctrl+Win is being held (push-to-talk) or the
+      // recording is locked; the renderer's recording updates carry neither.
+      if (payload.state === "recording") {
+        payload = { ...payload, locked: !shortcutController?.isHoldGesture() };
+      }
     }
     applyUiState(payload);
   });
