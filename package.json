@@ -1,6 +1,6 @@
 {
   "name": "local-flow",
-  "version": "0.8.15",
+  "version": "0.8.16",
   "private": true,
   "description": "Aplicativo local de ditado e transcrição para Windows",
   "author": "Thiago Marçal",
