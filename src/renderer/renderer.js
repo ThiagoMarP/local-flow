@@ -907,7 +907,7 @@ function renderHistory(items) {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "history-empty";
-    empty.textContent = "Nenhuma transcrição ainda.";
+    empty.textContent = "Nenhuma transcrição ainda. Dite com o atalho e o texto aparece aqui.";
     historyList.append(empty);
     historyClearButton.disabled = true;
     return;
@@ -1004,12 +1004,21 @@ let historyLoadGeneration = 0;
 function profileLabel(value) {
   return (
     {
-      fast: "Rápido",
-      standard: "Padrão",
-      accurate: "Precisão",
-      parakeet: "Parakeet",
+      fast: "Small",
+      standard: "Medium",
+      accurate: "Large V3 Turbo",
+      parakeet: "Parakeet v3",
     }[value] || "—"
   );
+}
+
+// The dictation model shows by name on Início and is marked "Em uso" on the
+// Modelos page.
+function showActiveModel() {
+  if (statModel) statModel.textContent = profileLabel(profileSelect.value);
+  for (const item of document.querySelectorAll(".model-item")) {
+    item.dataset.active = String(item.dataset.profile === profileSelect.value);
+  }
 }
 
 function renderStats(items) {
@@ -1025,7 +1034,7 @@ function renderStats(items) {
       );
     statWords.textContent = words.toLocaleString("pt-BR");
   }
-  if (statModel) statModel.textContent = profileLabel(profileSelect.value);
+  showActiveModel();
 }
 
 function applyHistoryFilter() {
@@ -1060,11 +1069,20 @@ function showPage(name) {
   for (const page of pages) {
     page.hidden = page.dataset.page !== name;
   }
+  if (name === "models") showActiveModel();
   // Recarrega as reuniões ao abrir a página (uma captura pode ter ocorrido).
   if (name === "meetings") meetingsController.refresh().catch(() => {});
 }
 for (const item of navItems) {
   item.addEventListener("click", () => showPage(item.dataset.page));
+}
+// Section shortcuts at the top of Settings. Buttons, not #anchors: a hash
+// change is a navigation, which main treats as the renderer being interrupted.
+for (const button of document.querySelectorAll(".section-nav [data-section]")) {
+  button.addEventListener("click", () => {
+    document.getElementById(button.dataset.section)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 window.localFlow.onNavigate((page) => {
   if (navItems.some((item) => item.dataset.page === page)) showPage(page);
@@ -1109,7 +1127,7 @@ historyClearButton.addEventListener("click", async () => {
 });
 profileSelect.addEventListener("change", () => {
   publishUiState();
-  if (statModel) statModel.textContent = profileLabel(profileSelect.value);
+  showActiveModel();
 });
 
 window.addEventListener("beforeunload", () => {
@@ -1315,7 +1333,7 @@ async function initialize() {
     // Settings can restore a profile after the first readiness pass. Apply the
     // model constraints again so an unavailable saved profile is never used.
     applyProfileAvailability(runtime.profiles);
-    if (statModel) statModel.textContent = profileLabel(profileSelect.value);
+    showActiveModel();
     meetingShortcutHint.textContent = selectedShortcutLabel(meetingShortcutSelect);
     syncMeetingModelAvailability();
     const hotkey = runtime.hotkey || {};

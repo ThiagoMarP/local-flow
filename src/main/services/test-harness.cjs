@@ -26,6 +26,16 @@ class TestHarness {
       await mkdir(path.dirname(target), { recursive: true });
       window.showInactive();
       await new Promise((resolve) => setTimeout(resolve, 1000));
+      // "page" or "page#sectionId": opens a dashboard page, optionally
+      // scrolled to one section.
+      if (process.env.LOCAL_FLOW_CAPTURE_PAGE) {
+        const [page, section = ""] = process.env.LOCAL_FLOW_CAPTURE_PAGE.split("#");
+        await window.webContents.executeJavaScript(
+          `document.querySelector('.nav-item[data-page="${page.replace(/[^a-z]/g, "")}"]')?.click();` +
+            `document.getElementById("${section.replace(/[^A-Za-z]/g, "")}")?.scrollIntoView({ block: "start" });`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
       if (process.env.LOCAL_FLOW_SETTINGS_PREVIEW === "1") {
         await window.webContents.executeJavaScript(
           "new Promise((resolve) => { const tick = () => { if (document.querySelector('#revisionModeTrigger')) resolve(); else setTimeout(tick, 50); }; tick(); }).then(() => { document.querySelector('[data-page=\"settings\"].nav-item')?.click(); document.querySelector('#revisionModeTrigger')?.scrollIntoView({block:'center'}); })",

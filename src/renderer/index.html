@@ -96,27 +96,20 @@
       <main class="app-content">
         <!-- ===================== INÍCIO ===================== -->
         <section class="page" data-page="home">
-          <div class="stats-grid">
-            <div class="stat-card">
-              <span class="stat-value" id="statTotal">0</span>
-              <span class="stat-label">transcrições</span>
+          <header class="page-header">
+            <div>
+              <h1>Início</h1>
+              <p class="page-summary">
+                <span><strong id="statTotal">0</strong> transcrições</span>
+                <span><strong id="statWords">0</strong> palavras na semana</span>
+                <span>Modelo <strong id="statModel">—</strong></span>
+              </p>
             </div>
-            <div class="stat-card">
-              <span class="stat-value" id="statWords">0</span>
-              <span class="stat-label">palavras na semana</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value" id="statModel">—</span>
-              <span class="stat-label">modelo ativo</span>
-            </div>
-          </div>
+          </header>
 
           <section class="panel recorder-panel">
             <div class="status-row">
-              <div>
-                <p class="label">Estado</p>
-                <p class="status" id="status" role="status">Verificando o mecanismo local…</p>
-              </div>
+              <p class="status" id="status" role="status">Verificando o mecanismo local…</p>
               <p class="timer" id="timer">00:00</p>
             </div>
 
@@ -124,23 +117,40 @@
               <span id="meterFill"></span>
             </div>
 
-            <div class="controls">
-              <button class="button primary" id="recordButton" disabled>
-                Iniciar gravação
-              </button>
-              <button class="button danger" id="stopButton" disabled>
-                Parar e transcrever
-              </button>
-              <button class="button secondary" id="discardRecordingButton" disabled>
-                Cancelar ditado (Esc)
-              </button>
+            <div class="recorder-footer">
+              <div class="controls">
+                <button class="button primary" id="recordButton" disabled>
+                  <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="9" y="3" width="6" height="11" rx="3" />
+                    <path d="M6 11a6 6 0 0 0 12 0M12 17v4" />
+                  </svg>
+                  Iniciar gravação
+                </button>
+                <button class="button primary stop" id="stopButton" disabled>
+                  <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="7" y="7" width="10" height="10" rx="2" />
+                  </svg>
+                  Parar e transcrever
+                </button>
+                <button class="button secondary" id="discardRecordingButton" disabled>
+                  Cancelar (Esc)
+                </button>
+              </div>
+
+              <div class="shortcut-hint">
+                <span class="shortcut-key" id="shortcutKey">Verificando…</span>
+                <p class="shortcut-description" id="shortcutDescription">
+                  Pressione uma vez para iniciar e novamente para transcrever.
+                </p>
+                <span class="shortcut-status" id="shortcutStatus">Verificando…</span>
+              </div>
             </div>
           </section>
 
           <section class="panel last-message-panel">
             <div class="result-header">
               <div>
-                <p class="label">Última mensagem</p>
+                <h2>Última transcrição</h2>
                 <p class="result-meta" id="lastMessageMeta">
                   Nenhuma transcrição ainda.
                 </p>
@@ -160,23 +170,21 @@
               placeholder="Sua última transcrição aparecerá aqui."
             ></textarea>
           </section>
-
-          <section class="panel shortcut-panel">
-            <div class="shortcut-copy">
-              <p class="label">Atalho global</p>
-              <p class="shortcut-description" id="shortcutDescription">
-                Pressione uma vez para iniciar e novamente para transcrever.
-              </p>
-            </div>
-            <div class="shortcut-key" id="shortcutKey">
-              Verificando…
-            </div>
-            <span class="shortcut-status" id="shortcutStatus">Verificando…</span>
-          </section>
         </section>
 
         <!-- ===================== HISTÓRICO ===================== -->
         <section class="page" data-page="history" hidden>
+          <header class="page-header">
+            <div>
+              <h1>Histórico</h1>
+              <p class="page-summary">
+                <span><strong id="historyCount">0</strong> transcrições salvas neste computador</span>
+              </p>
+            </div>
+            <button class="button ghost-danger" id="historyClearButton" type="button">
+              Limpar histórico
+            </button>
+          </header>
           <div class="page-toolbar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -187,33 +195,44 @@
                 id="historySearch"
                 type="search"
                 placeholder="Buscar no histórico"
+                aria-label="Buscar no histórico"
                 autocomplete="off"
               />
             </div>
-            <span class="history-count">
-              <span id="historyCount">0</span> itens
-            </span>
-            <button class="button secondary" id="historyClearButton" type="button">
-              Limpar histórico
-            </button>
           </div>
           <div class="history-list" id="historyList"></div>
         </section>
 
         <!-- ===================== REUNIÕES ===================== -->
         <section class="page" data-page="meetings" hidden>
+          <header class="page-header">
+            <div>
+              <h1>Reuniões</h1>
+              <p class="page-summary">
+                <span><strong id="meetingsCount">0</strong> reuniões</span>
+                <span>Atalho <strong id="meetingShortcutHint">verificando…</strong></span>
+              </p>
+            </div>
+          </header>
           <section class="panel meeting-recorder-panel">
             <div class="status-row">
-              <div>
-                <p class="label">Gravação de reunião</p>
-                <p class="status" id="meetingStatus" role="status">Pronto para gravar.</p>
-              </div>
+              <p class="status" id="meetingStatus" role="status">Pronto para gravar.</p>
               <p class="timer" id="meetingTimer">00:00</p>
             </div>
-            <p class="meeting-capture-hint">O áudio capturado segue o modo escolhido em Configurações. Atalho: <span id="meetingShortcutHint">verificando…</span>.</p>
+            <p class="meeting-capture-hint">O áudio capturado segue o modo escolhido em Configurações → Reuniões.</p>
             <div class="controls">
-              <button class="button primary" id="meetingStartButton" type="button" disabled>Iniciar gravação</button>
-              <button class="button danger" id="meetingStopButton" type="button" disabled>Parar reunião</button>
+              <button class="button primary" id="meetingStartButton" type="button" disabled>
+                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="5" />
+                </svg>
+                Iniciar gravação
+              </button>
+              <button class="button primary stop" id="meetingStopButton" type="button" disabled>
+                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="7" y="7" width="10" height="10" rx="2" />
+                </svg>
+                Parar reunião
+              </button>
             </div>
           </section>
           <div class="page-toolbar">
@@ -226,28 +245,41 @@
                 id="meetingsSearch"
                 type="search"
                 placeholder="Buscar nas reuniões"
+                aria-label="Buscar nas reuniões"
                 autocomplete="off"
               />
             </div>
-            <span class="history-count">
-              <span id="meetingsCount">0</span> reuniões
-            </span>
           </div>
           <div class="meetings-list" id="meetingsList"></div>
         </section>
 
         <!-- ===================== CONFIGURAÇÕES ===================== -->
         <section class="page" data-page="settings" hidden>
-          <div class="settings-group">
+          <header class="page-header has-nav">
+            <div>
+              <h1>Configurações</h1>
+            </div>
+            <span class="settings-save-status" id="settingsSaveStatus">
+              Salvo localmente
+            </span>
+            <nav class="section-nav" aria-label="Seções das configurações">
+              <button type="button" data-section="settingsDictation">Ditado</button>
+              <button type="button" data-section="settingsShortcuts">Atalhos</button>
+              <button type="button" data-section="settingsMeetings">Reuniões</button>
+              <button type="button" data-section="settingsRevision">Revisão</button>
+              <button type="button" data-section="settingsPersonalization">Personalização</button>
+              <button type="button" data-section="settingsSystem">Sistema</button>
+            </nav>
+          </header>
+
+          <section class="settings-group" id="settingsDictation">
             <div class="settings-group-head">
-              <h2>Transcrição</h2>
-              <span class="settings-save-status" id="settingsSaveStatus">
-                Salvo localmente
-              </span>
+              <h2>Ditado</h2>
+              <p>Modelo de voz, microfone e limite de cada gravação.</p>
             </div>
             <div class="field-grid">
               <label class="field">
-                <span>Perfil do modelo</span>
+                <span>Modelo de voz</span>
                 <select id="profileSelect">
                   <option value="fast">Rápido · Small</option>
                   <option value="standard" selected>Padrão · Medium</option>
@@ -260,34 +292,6 @@
                 <select id="microphoneSelect">
                   <option value="default">Padrão do Windows</option>
                 </select>
-              </label>
-              <label class="field">
-                <span>Atalho do ditado</span>
-                <select id="shortcutSelect"></select>
-              </label>
-              <label class="field">
-                <span>Atalho da reunião</span>
-                <select id="meetingShortcutSelect"></select>
-              </label>
-              <label class="field">
-                <span>Colar a última transcrição</span>
-                <select id="repasteShortcutSelect"></select>
-              </label>
-              <label class="field field-wide">
-                <span>Modo de captura da reunião</span>
-                <select id="meetingCaptureModeSelect"></select>
-              </label>
-              <label class="field">
-                <span>Qualidade da reunião</span>
-                <select id="meetingProfileSelect">
-                  <option value="fast">Rápido · Small</option>
-                  <option value="standard">Padrão · Medium</option>
-                  <option value="accurate">Precisão · Large V3 Turbo</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Modelo do resumo (reunião)</span>
-                <select id="meetingSummaryModelSelect"></select>
               </label>
               <label class="field">
                 <span>Duração máxima</span>
@@ -308,38 +312,59 @@
                 />
               </label>
             </div>
-          </div>
+          </section>
 
-          <div class="settings-group">
-            <div class="settings-group-head"><h2>Comportamento</h2></div>
-            <div class="toggle-list">
-              <label class="toggle-row">
-                <input id="autoPasteInput" type="checkbox" />
-                <span>
-                  <strong>Colar automaticamente</strong>
-                  <small>Tenta colar no campo anteriormente ativo.</small>
-                </span>
+          <section class="settings-group" id="settingsShortcuts">
+            <div class="settings-group-head">
+              <h2>Atalhos</h2>
+              <p>Combinações globais: funcionam com qualquer app em foco.</p>
+            </div>
+            <div class="field-grid">
+              <label class="field">
+                <span>Ditado (alternativa ao Ctrl + Win)</span>
+                <select id="shortcutSelect"></select>
               </label>
-              <input id="restoreClipboardInput" type="checkbox" hidden />
-              <label class="toggle-row">
-                <input id="launchAtLoginInput" type="checkbox" />
-                <span>
-                  <strong>Iniciar com o Windows</strong>
-                  <small>Executa o Local Flow após entrar na conta.</small>
-                </span>
+              <label class="field">
+                <span>Colar a última transcrição</span>
+                <select id="repasteShortcutSelect"></select>
               </label>
-              <label class="toggle-row">
-                <input id="startMinimizedInput" type="checkbox" />
-                <span>
-                  <strong>Iniciar minimizado</strong>
-                  <small>Mantém somente o ícone na bandeja.</small>
-                </span>
+              <label class="field">
+                <span>Gravar reunião</span>
+                <select id="meetingShortcutSelect"></select>
               </label>
             </div>
-          </div>
+          </section>
 
-          <div class="settings-group">
-            <div class="settings-group-head"><h2>Revisão local</h2></div>
+          <section class="settings-group" id="settingsMeetings">
+            <div class="settings-group-head">
+              <h2>Reuniões</h2>
+              <p>O que é capturado e como a reunião é transcrita e resumida.</p>
+            </div>
+            <div class="field-grid">
+              <label class="field field-wide">
+                <span>Modo de captura</span>
+                <select id="meetingCaptureModeSelect"></select>
+              </label>
+              <label class="field">
+                <span>Qualidade da transcrição</span>
+                <select id="meetingProfileSelect">
+                  <option value="fast">Rápido · Small</option>
+                  <option value="standard">Padrão · Medium</option>
+                  <option value="accurate">Precisão · Large V3 Turbo</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Modelo do resumo</span>
+                <select id="meetingSummaryModelSelect"></select>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-group" id="settingsRevision">
+            <div class="settings-group-head">
+              <h2>Revisão local</h2>
+              <p>Como a IA local trata o texto antes de colar.</p>
+            </div>
             <div class="field-grid">
               <label class="field revision-mode-field">
                 <span>Tratamento do texto</span>
@@ -363,10 +388,13 @@
               <span class="status-dot"></span>
               <span>Verificando Ollama local…</span>
             </div>
-          </div>
+          </section>
 
-          <div class="settings-group">
-            <div class="settings-group-head"><h2>Personalização</h2></div>
+          <section class="settings-group" id="settingsPersonalization">
+            <div class="settings-group-head">
+              <h2>Personalização</h2>
+              <p>Tom da escrita, trocas automáticas de palavras e textos prontos.</p>
+            </div>
             <div class="field-grid">
               <label class="field profile-field">
                 <span>Perfil de escrita</span>
@@ -399,32 +427,64 @@
                 <small>Use \n para inserir uma quebra de linha.</small>
               </label>
             </div>
-          </div>
+          </section>
+
+          <section class="settings-group" id="settingsSystem">
+            <div class="settings-group-head">
+              <h2>Sistema</h2>
+              <p>Colagem e inicialização com o Windows.</p>
+            </div>
+            <div class="toggle-list">
+              <label class="toggle-row">
+                <span>
+                  <strong>Colar automaticamente</strong>
+                  <small>Tenta colar no campo anteriormente ativo.</small>
+                </span>
+                <input id="autoPasteInput" type="checkbox" role="switch" />
+              </label>
+              <input id="restoreClipboardInput" type="checkbox" hidden />
+              <label class="toggle-row">
+                <span>
+                  <strong>Iniciar com o Windows</strong>
+                  <small>Executa o Local Flow após entrar na conta.</small>
+                </span>
+                <input id="launchAtLoginInput" type="checkbox" role="switch" />
+              </label>
+              <label class="toggle-row">
+                <span>
+                  <strong>Iniciar minimizado</strong>
+                  <small>Mantém somente o ícone na bandeja.</small>
+                </span>
+                <input id="startMinimizedInput" type="checkbox" role="switch" />
+              </label>
+            </div>
+          </section>
         </section>
 
         <!-- ===================== MODELOS ===================== -->
         <section class="page" data-page="models" id="setupPanel" hidden>
-          <div class="settings-group">
-            <div class="settings-group-head">
-              <h2>Modelos de voz</h2>
-              <span class="settings-save-status" id="setupSummaryStatus">
-                Verificando…
-              </span>
+          <header class="page-header">
+            <div>
+              <h1>Modelos de voz</h1>
+              <p class="page-summary">
+                Baixados de huggingface.co e salvos apenas neste computador.
+              </p>
             </div>
-            <div class="setup-engine-row">
-              <div class="local-engine-status" id="whisperEngineStatus">
-                <span class="status-dot"></span>
-                <span>Verificando os mecanismos de transcrição…</span>
-              </div>
-              <p class="setup-path" id="modelsDirPath"></p>
+            <span class="settings-save-status" id="setupSummaryStatus">
+              Verificando…
+            </span>
+          </header>
+          <div class="setup-engine-row">
+            <div class="local-engine-status" id="whisperEngineStatus">
+              <span class="status-dot"></span>
+              <span>Verificando os mecanismos de transcrição…</span>
             </div>
-            <ul class="model-list" id="modelList"></ul>
-            <p class="setup-hint">
-              Os modelos são baixados de huggingface.co e ficam salvos apenas
-              neste computador. Após o download, escolha o perfil em
-              Configurações → Transcrição.
-            </p>
+            <p class="setup-path" id="modelsDirPath"></p>
           </div>
+          <ul class="model-list" id="modelList"></ul>
+          <p class="setup-hint">
+            Depois de baixar, escolha qual usar em Configurações → Ditado.
+          </p>
         </section>
       </main>
     </div>
