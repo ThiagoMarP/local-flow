@@ -7,6 +7,7 @@ export function createSettingsController({
   microphoneSelect,
   shortcutSelect,
   meetingShortcutSelect,
+  repasteShortcutSelect,
   meetingCaptureModeSelect,
   meetingProfileSelect,
   meetingSummaryModelSelect,
@@ -31,6 +32,7 @@ export function createSettingsController({
     microphoneSelect,
     shortcutSelect,
     meetingShortcutSelect,
+    repasteShortcutSelect,
     meetingCaptureModeSelect,
     meetingProfileSelect,
     meetingSummaryModelSelect,
@@ -93,6 +95,7 @@ export function createSettingsController({
       microphoneId: microphoneSelect.value,
       shortcut: shortcutSelect.value,
       meetingShortcut: meetingShortcutSelect.value,
+      repasteShortcut: repasteShortcutSelect.value,
       meetingCaptureMode: meetingCaptureModeSelect.value,
       meetingProfile: meetingProfileSelect.value,
       meetingSummaryModel: meetingSummaryModelSelect.value,
@@ -141,6 +144,15 @@ export function createSettingsController({
       }),
     );
     meetingShortcutSelect.value = settings.meetingShortcut;
+    repasteShortcutSelect.replaceChildren(
+      ...settings.allowedRepasteShortcuts.map((item) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.label;
+        return option;
+      }),
+    );
+    repasteShortcutSelect.value = settings.repasteShortcut;
     meetingCaptureModeSelect.replaceChildren(
       ...settings.allowedMeetingCaptureModes.map((item) => {
         const option = document.createElement("option");

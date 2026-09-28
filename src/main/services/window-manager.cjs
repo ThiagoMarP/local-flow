@@ -74,7 +74,7 @@ class WindowManager {
       display: "Ctrl+Shift+Espaço",
     };
     this.hotkeyStatus = { enabled: true, ready: false, display: "Ctrl + Win" };
-    this.repasteStatus = { registered: false, display: "Ctrl+Alt+V" };
+    this.repasteStatus = { registered: false, disabled: false, display: "Ctrl+Alt+V" };
     this.currentUiState = normalizeUiState({
       state: "idle",
       message: "Pronto",
@@ -314,9 +314,11 @@ class WindowManager {
           enabled: false,
         },
         {
-          label: this.repasteStatus.registered
-            ? `Colar última: ${this.repasteStatus.display}`
-            : "Colar última indisponível",
+          label: this.repasteStatus.disabled
+            ? "Colar última: desativado"
+            : this.repasteStatus.registered
+              ? `Colar última: ${this.repasteStatus.display}`
+              : `Colar última: ${this.repasteStatus.display} indisponível`,
           enabled: false,
         },
         { type: "separator" },

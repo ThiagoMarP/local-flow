@@ -51,6 +51,9 @@ const shortcutSelect = document.querySelector("#shortcutSelect");
 const meetingShortcutSelect = document.querySelector(
   "#meetingShortcutSelect",
 );
+const repasteShortcutSelect = document.querySelector(
+  "#repasteShortcutSelect",
+);
 const meetingCaptureModeSelect = document.querySelector(
   "#meetingCaptureModeSelect",
 );
@@ -96,6 +99,7 @@ const settingsController = createSettingsController({
   microphoneSelect,
   shortcutSelect,
   meetingShortcutSelect,
+  repasteShortcutSelect,
   meetingCaptureModeSelect,
   meetingProfileSelect,
   meetingSummaryModelSelect,

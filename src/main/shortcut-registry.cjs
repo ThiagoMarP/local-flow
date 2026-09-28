@@ -1,8 +1,4 @@
-// Pastes the last transcription again. Fixed for now: Ctrl+Alt is free of the
-// dictation and browser combos, and the paste helper waits for these modifiers
-// to be released before it sends its own Ctrl+V.
-const REPASTE_SHORTCUT = "CommandOrControl+Alt+V";
-const REPASTE_SHORTCUT_DISPLAY = "Ctrl+Alt+V";
+const { REPASTE_SHORTCUT_OFF } = require("./services/settings-store.cjs");
 
 // Global dictation, meeting and repaste shortcuts. Electron's globalShortcut
 // only offers unregisterAll() cheaply, so re-registering dictation also
@@ -32,6 +28,10 @@ class ShortcutRegistry {
     this.activeMeetingShortcut = "CommandOrControl+Alt+R";
     this.registered = false;
     this.registrationError = "";
+    // The repaste shortcut the user chose, or "off". Read from settings on
+    // the first registration, then owned here so re-registering dictation
+    // (unregisterAll) restores the active one.
+    this.activeRepasteShortcut = null;
     this.repasteRegistered = false;
   }
 
@@ -49,16 +49,43 @@ class ShortcutRegistry {
     this.globalShortcut.register(shortcut, () => this.onMeeting());
   }
 
-  registerRepaste() {
-    if (!this.onRepaste) return;
-    this.repasteRegistered = this.globalShortcut.register(
-      REPASTE_SHORTCUT,
-      () => this.onRepaste(),
-    );
+  // The paste helper waits for the shortcut's modifiers to be released before
+  // it sends its own Ctrl+V, so any Ctrl+Alt+… combo is safe here.
+  registerRepaste(
+    shortcut = this.activeRepasteShortcut ?? this.settingsStore.get().repasteShortcut,
+  ) {
+    if (!this.onRepaste) return false;
+    this.activeRepasteShortcut = shortcut;
+    const disabled = shortcut === REPASTE_SHORTCUT_OFF;
+    this.repasteRegistered = disabled
+      ? false
+      : this.globalShortcut.register(shortcut, () => this.onRepaste());
     this.windowManager?.setRepasteStatus?.({
       registered: this.repasteRegistered,
-      display: REPASTE_SHORTCUT_DISPLAY,
+      disabled,
+      display: this.formatRepaste(shortcut),
     });
+    return disabled || this.repasteRegistered;
+  }
+
+  // Falls back to the previous shortcut when the new one is taken.
+  updateRepaste(nextShortcut) {
+    const previous = this.activeRepasteShortcut;
+    if (previous && previous !== REPASTE_SHORTCUT_OFF && this.repasteRegistered) {
+      this.globalShortcut.unregister(previous);
+    }
+    if (this.registerRepaste(nextShortcut)) return true;
+    if (previous) this.registerRepaste(previous);
+    return false;
+  }
+
+  formatRepaste(accelerator) {
+    return (
+      this.settingsStore
+        ?.getPublic()
+        .allowedRepasteShortcuts?.find((item) => item.value === accelerator)
+        ?.label || accelerator
+    );
   }
 
   replaceMeeting(shortcut) {
@@ -113,12 +140,12 @@ class ShortcutRegistry {
       registered: this.registered,
       error: this.registrationError,
       repaste: {
-        accelerator: REPASTE_SHORTCUT,
-        display: REPASTE_SHORTCUT_DISPLAY,
+        accelerator: this.activeRepasteShortcut,
+        display: this.formatRepaste(this.activeRepasteShortcut),
         registered: this.repasteRegistered,
       },
     };
   }
 }
 
-module.exports = { REPASTE_SHORTCUT, ShortcutRegistry };
+module.exports = { ShortcutRegistry };

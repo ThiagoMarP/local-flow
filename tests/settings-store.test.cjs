@@ -96,3 +96,32 @@ test("migra configurações da versão anterior", async () => {
   assert.equal(saved.revisionMode, "literal");
   assert.equal(saved.writingProfile, "neutral");
 });
+
+// O atalho global de colar a última pode brigar com outro app (Colar Especial
+// do Word, Extract Variable da JetBrains), então dá para trocar ou desligar.
+test("atalho de colar a última aceita só a lista conhecida ou desativado", () => {
+  assert.equal(DEFAULT_SETTINGS.repasteShortcut, "CommandOrControl+Alt+V");
+  assert.equal(normalizeSettings({}).repasteShortcut, "CommandOrControl+Alt+V");
+  assert.equal(
+    normalizeSettings({ repasteShortcut: "CommandOrControl+Alt+B" }).repasteShortcut,
+    "CommandOrControl+Alt+B",
+  );
+  assert.equal(normalizeSettings({ repasteShortcut: "off" }).repasteShortcut, "off");
+  assert.equal(
+    normalizeSettings({ repasteShortcut: "Alt+F4" }).repasteShortcut,
+    "CommandOrControl+Alt+V",
+  );
+});
+
+test("expõe as opções e o rótulo do atalho de colar a última", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "lf-settings-"));
+  const store = new SettingsStore({ filePath: path.join(directory, "settings.json") });
+  await store.load();
+  await store.update({ repasteShortcut: "off" });
+  const settings = store.getPublic();
+  assert.equal(settings.repasteShortcutDisplay, "Desativado");
+  assert.deepEqual(
+    settings.allowedRepasteShortcuts.map((item) => item.label),
+    ["Ctrl+Alt+V", "Ctrl+Alt+B", "Ctrl+Alt+Shift+V", "Desativado"],
+  );
+});
