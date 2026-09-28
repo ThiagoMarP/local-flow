@@ -1,10 +1,13 @@
 node_modules/
 native/whisper/
+native/parakeet/include/
+native/parakeet/lib/
 models/
 benchmarks/samples/*.wav
 benchmarks/results/*.json
 benchmarks/results/*.md
 work/
+dist/
 *.log
 *.tmp
 
