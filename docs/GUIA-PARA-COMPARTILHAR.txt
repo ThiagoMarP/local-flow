@@ -1,0 +1,107 @@
+LOCAL FLOW {{VERSION}} — GUIA DE INSTALAÇÃO E PRIMEIRO USO
+
+O Local Flow transforma sua voz em texto no Windows. A transcrição acontece
+localmente no computador. Não é necessário criar uma conta e o áudio temporário
+é apagado depois do processamento.
+
+O QUE TEM NESTA PASTA
+
+- Local Flow Setup {{VERSION}}.exe: instalador do aplicativo.
+- LEIA-ME - INSTALACAO.txt: este guia.
+
+REQUISITOS
+
+- Windows 10 ou Windows 11 de 64 bits.
+- Internet durante a primeira configuração.
+- Aproximadamente 190 MB livres para o modelo Small, além do espaço do app.
+- Microfone funcionando no Windows.
+
+1. INSTALAÇÃO
+
+1. Dê dois cliques em "Local Flow Setup {{VERSION}}.exe".
+2. Siga as telas do instalador e clique em Concluir.
+3. O painel do Local Flow abrirá automaticamente. Se isso não acontecer, abra
+   "Local Flow" pelo menu Iniciar ou pelo atalho da área de trabalho.
+
+Se o SmartScreen exibir "O Windows protegeu o computador", clique em "Mais
+informações" e, se a opção estiver disponível, em "Executar assim mesmo".
+
+Se a mensagem for "Smart App Control blocked an app" e existir somente o botão
+"Okay", essa versão de teste não pode ser liberada individualmente naquele PC.
+Não desative a proteção somente para instalar o programa. Nesse caso, aguarde a
+versão assinada publicamente ou publicada na Microsoft Store.
+
+2. PRIMEIRO MODELO DE VOZ
+
+Na primeira abertura, sem nenhum modelo instalado, o Local Flow abre a página
+Modelos e mostra um sinal amarelo de exclamação (!) nessa aba.
+
+1. Em "Small · rápido", clique em "Baixar".
+2. Aguarde a barra chegar a 100%. Não feche o aplicativo durante o download.
+3. Quando aparecer "Disponível", o botão de gravação será liberado.
+
+O Small é o modelo recomendado para começar: ocupa cerca de 190 MB e entrega a
+melhor velocidade. Se o download falhar, o Local Flow exibirá o motivo na tela;
+verifique a internet e clique em Tentar novamente.
+
+3. TESTE DO MICROFONE
+
+1. Abra a tela Início.
+2. Clique em "Iniciar gravação", fale uma frase e clique em
+   "Parar e transcrever".
+3. O texto deve aparecer em "Última mensagem".
+
+Se aparecer "Não foi possível acessar o microfone":
+
+1. Abra Configurações do Windows > Privacidade e segurança > Microfone.
+2. Ative "Acesso ao microfone" e "Permitir que aplicativos da área de trabalho
+   acessem o microfone".
+3. Feche outros programas que possam estar usando o microfone exclusivamente.
+4. Reabra o Local Flow e teste novamente.
+
+4. CONFIGURAÇÃO USADA POR THIAGO MARÇAL
+
+- Perfil de voz: Rápido · Small.
+- Tratamento do texto: Limpo.
+- Modelo de revisão: qwen2.5:3b no Ollama.
+- Colar automaticamente: ligado.
+- Iniciar com o Windows: ligado, se quiser deixar o app sempre disponível.
+
+O Small faz a transcrição rapidamente. O modo Limpo usa uma IA local para
+ajustar pontuação, maiúsculas e pequenas hesitações sem resumir o conteúdo. Se o
+Ollama não estiver disponível, o Local Flow mantém a transcrição original.
+
+5. OLLAMA — OPCIONAL, RECOMENDADO PARA O MODO LIMPO
+
+O Local Flow funciona sem Ollama. Instale-o somente se quiser a revisão local
+do texto.
+
+1. Baixe o Ollama para Windows em https://ollama.com/download.
+2. Instale e abra o Ollama.
+3. Abra o PowerShell pelo menu Iniciar.
+4. Execute:
+
+   ollama pull qwen2.5:3b
+
+5. Espere o download terminar.
+6. No Local Flow, abra Configurações, escolha o tratamento "Limpo" e selecione
+   qwen2.5:3b como modelo de revisão.
+
+6. COMO USAR
+
+- Pelo painel: clique em Iniciar gravação e depois em Parar e transcrever.
+- Pelo teclado: use o atalho configurado no Local Flow. A alternativa padrão é
+  Ctrl + Shift + Espaço.
+- Em Configurações > Vocabulário de contexto, adicione nomes, marcas, siglas e
+  termos técnicos usados com frequência.
+- Em Substituições, corrija erros recorrentes, por exemplo:
+
+  thiago marcial => Thiago Marçal
+
+ATUALIZAÇÃO E DESINSTALAÇÃO
+
+Para atualizar, execute o instalador mais novo por cima da versão atual. As
+configurações, o histórico e os modelos baixados são preservados.
+
+Para desinstalar, use Configurações do Windows > Aplicativos > Aplicativos
+instalados > Local Flow > Desinstalar.

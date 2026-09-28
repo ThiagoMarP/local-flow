@@ -1,0 +1,80 @@
+appId: com.localflow.desktop
+productName: Local Flow
+copyright: © 2026 Local Flow
+
+# The app source is packed into app.asar. Native binaries and PowerShell helpers
+# cannot run from inside an asar, so they ship as extraResources on disk under
+# resources/. The 1.27 GB of Whisper models are NOT bundled — the first-run
+# wizard downloads them into the per-user data directory.
+asar: true
+directories:
+  output: dist
+
+files:
+  - src/**/*
+  - assets/**/*
+  - package.json
+  - "!**/*.map"
+
+extraResources:
+  - from: native/whisper
+    to: native/whisper
+    filter:
+      - whisper-cli.exe
+      - whisper.dll
+      - ggml.dll
+      - ggml-base.dll
+      - ggml-cpu-*.dll
+  - from: native/parakeet
+    to: native/parakeet
+    filter:
+      - bin/**/*
+      - share/**/*
+  - from: native/windows
+    to: native/windows
+    filter:
+      - foreground-helper.ps1
+      - hotkey-listener.ps1
+
+win:
+  target:
+    - nsis
+  icon: assets/icon.ico
+  artifactName: ${productName} Setup ${version}.exe
+
+# Pacote de desenvolvimento para validar o fluxo MSIX antes do cadastro no
+# Microsoft Partner Center. O Publisher da versão pública será substituído pela
+# identidade atribuída pela Store; este valor precisa coincidir com o
+# certificado local criado por scripts/build-msix-dev.ps1.
+appx:
+  applicationId: LocalFlow
+  identityName: com.localflow.desktop
+  publisher: CN=Thiago Marcal
+  publisherDisplayName: Thiago Marçal
+  displayName: Local Flow
+  languages:
+    - pt-BR
+  artifactName: ${productName} Teste ${version}.${ext}
+  minVersion: 10.0.19041.0
+  maxVersionTested: 10.0.26100.0
+  capabilities:
+    - internetClient
+    - privateNetworkClientServer
+    - runFullTrust
+    - microphone
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Local Flow
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
+  installerLanguages:
+    - pt_BR
+  language: "1046"
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
