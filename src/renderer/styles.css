@@ -1448,7 +1448,8 @@ input[role="switch"]:disabled {
   transition: width 120ms linear;
 }
 
-.model-button {
+.model-button,
+.model-use {
   min-height: 32px;
   padding: 0 14px;
   font-size: 12.5px;
@@ -1456,13 +1457,13 @@ input[role="switch"]:disabled {
 }
 
 /* Installed: re-downloading is a rare repair, not the row's main action. */
-.model-item[data-available="true"] .model-button[data-role="download"] {
+.model-button[data-role="redownload"] {
   border-color: transparent;
   background: transparent;
   color: var(--text-3);
 }
 
-.model-item[data-available="true"] .model-button[data-role="download"]:hover:not(:disabled) {
+.model-button[data-role="redownload"]:hover:not(:disabled) {
   background: #ffffff0d;
   color: var(--text);
 }

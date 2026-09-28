@@ -147,7 +147,7 @@ function createRenderer(options = {}) {
       get: () => ({ maxRecordingSeconds: 600 }),
       getDraft: () => ({ replacements: [], snippets: [] }),
     }),
-    createSetupController: () => ({ setDisabled() {} }),
+    createSetupController: () => ({ setDisabled() {}, setActiveProfile() {} }),
     createMeetingsController: () => ({ refresh: async () => {} }),
     isMeetingCapturing: () => false,
     startMeetingCapture: async () => {},

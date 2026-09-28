@@ -169,7 +169,17 @@ const setupController = createSetupController({
   modelList: document.querySelector("#modelList"),
   onModelsChanged: applyProfileAvailability,
   onSetupRequired: () => showPage("models"),
+  onUseModel: useModel,
 });
+
+// "Usar este" on the Modelos page goes through the same select as Settings, so
+// saving, the Início summary and the "Em uso" badge all follow.
+function useModel(profile) {
+  const option = [...profileSelect.options].find((item) => item.value === profile);
+  if (!option || option.disabled || isBusyState(state)) return;
+  profileSelect.value = profile;
+  profileSelect.dispatchEvent(new Event("change"));
+}
 
 let audioContext;
 let sourceNode;
@@ -1048,9 +1058,7 @@ function profileLabel(value) {
 // Modelos page.
 function showActiveModel() {
   if (statModel) statModel.textContent = profileLabel(profileSelect.value);
-  for (const item of document.querySelectorAll(".model-item")) {
-    item.dataset.active = String(item.dataset.profile === profileSelect.value);
-  }
+  setupController.setActiveProfile(profileSelect.value);
 }
 
 function renderStats(items) {
