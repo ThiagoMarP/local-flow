@@ -1116,6 +1116,9 @@ for (const button of document.querySelectorAll(".section-nav [data-section]")) {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
+window.localFlow.onRevisionModeChanged((mode) => {
+  settingsController.applyRevisionMode(mode);
+});
 window.localFlow.onNavigate((page) => {
   if (navItems.some((item) => item.dataset.page === page)) showPage(page);
 });

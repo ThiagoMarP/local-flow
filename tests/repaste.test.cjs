@@ -100,3 +100,14 @@ test("falha inesperada vira erro na cápsula em vez de exceção", async () => {
   assert.equal(calls.states[0].state, "error");
   assert.equal(calls.states[0].message, "Não consegui colar");
 });
+
+test("com destino informado, não captura a janela em foco", async () => {
+  const { paster, calls } = setup({
+    insertResult: { autoPasted: false, clipboardRestored: false, reason: "target-unavailable" },
+  });
+  const tray = { hwnd: null, isSelf: false };
+  assert.equal(await paster.paste({ target: tray }), "copied");
+  assert.equal(calls.captured, 0);
+  assert.equal(calls.inserted[0].target, tray);
+  assert.equal(calls.states[0].manualPaste, true);
+});

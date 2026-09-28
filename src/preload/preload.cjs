@@ -59,6 +59,11 @@ contextBridge.exposeInMainWorld("localFlow", {
   capsuleAction: (action) => ipcRenderer.invoke("capsule:action", action),
   capsuleHover: (hovering) =>
     ipcRenderer.send("capsule:hover", Boolean(hovering)),
+  onRevisionModeChanged: (listener) => {
+    const handler = (_event, mode) => listener(mode);
+    ipcRenderer.on("settings:revision-mode", handler);
+    return () => ipcRenderer.removeListener("settings:revision-mode", handler);
+  },
   onNavigate: (listener) => {
     const handler = (_event, page) => listener(page);
     ipcRenderer.on("app:navigate", handler);

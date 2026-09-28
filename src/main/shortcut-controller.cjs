@@ -52,7 +52,9 @@ class ToggleDictationController {
 
   // Begin a recording. Used directly by the push-to-talk (hold) gesture, which
   // must not be debounced because the user controls the press/release timing.
-  async start() {
+  // A caller that already knows where the text goes (the tray, which has taken
+  // focus from the user's app) passes `target` and skips the capture.
+  async start({ target: knownTarget } = {}) {
     this.recoverIfStale();
     if (this.state !== "idle") {
       return { accepted: false, reason: "busy", state: this.state };
@@ -60,7 +62,7 @@ class ToggleDictationController {
     this.setState("starting");
     const generation = this.generation;
     try {
-      const target = await this.captureTarget();
+      const target = knownTarget ?? await this.captureTarget();
       if (generation !== this.generation) {
         return { accepted: false, reason: "cancelled", state: this.state };
       }
@@ -93,14 +95,14 @@ class ToggleDictationController {
 
   // Toggle entry point for the accelerator and the double-tap gesture. The
   // debounce here swallows keyboard auto-repeat from the global accelerator.
-  async toggle() {
+  async toggle(options = {}) {
     const now = this.clock();
     if (now - this.lastToggleAt < this.debounceMs) {
       return { accepted: false, reason: "debounce", state: this.state };
     }
     this.lastToggleAt = now;
     this.recoverIfStale();
-    if (this.state === "idle") return this.start();
+    if (this.state === "idle") return this.start(options);
     if (this.state === "recording") return this.stop();
     return { accepted: false, reason: "busy", state: this.state };
   }

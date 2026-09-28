@@ -24,14 +24,16 @@ class LastTranscriptionPaster {
     this.pending = false;
   }
 
-  async paste() {
+  // `target` overrides the foreground capture (the tray passes one: opening it
+  // takes focus from the app the user was in).
+  async paste({ target: knownTarget } = {}) {
     // A dictation owns the clipboard and the capsule until it finishes.
     if (this.pending || this.isBusy()) return "busy";
     this.pending = true;
     try {
       // Capture first: the foreground window is the field the user was in
       // when they pressed the shortcut.
-      const target = await this.captureTarget();
+      const target = knownTarget ?? await this.captureTarget();
       const last = await this.historyStore?.last();
       const text = last?.correctedText || last?.text;
       if (!text) {

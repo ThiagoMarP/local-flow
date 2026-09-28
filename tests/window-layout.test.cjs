@@ -362,3 +362,40 @@ test("normaliza a dica da gravação e o tempo restante", () => {
   assert.equal(normalizeUiState({ state: "recording", hint: "<b>" }).hint, null);
   assert.equal(normalizeUiState({ state: "recording", remainingMs: -5 }).remainingMs, 0);
 });
+
+// O menu da bandeja era remontado a cada atualização de nível do microfone
+// (até 12×/s durante a gravação). Só muda quando algo visível nele muda.
+test("menu da bandeja só é remontado quando o conteúdo muda", () => {
+  const built = [];
+  const MenuClass = { buildFromTemplate: (template) => ({ template }) };
+  const manager = new WindowManager({ displayScreen: { getAllDisplays: () => [], getPrimaryDisplay: () => ({}) }, MenuClass });
+  manager.capsuleWindow = {
+    isDestroyed: () => false,
+    setBounds: () => {},
+    setIgnoreMouseEvents: () => {},
+    showInactive: () => {},
+    webContents: { send: () => {} },
+  };
+  manager.tray = { setContextMenu: (menu) => built.push(menu.template) };
+  manager.setTrayActions({
+    toggleDictation: () => {},
+    copyLast: () => {},
+    setRevisionMode: () => {},
+  });
+  manager.setRevisionMode("literal", [{ value: "literal", label: "Literal" }]);
+  const afterSetup = built.length;
+
+  manager.applyUiState({ state: "recording", level: 0.2 });
+  manager.applyUiState({ state: "recording", level: 0.6 });
+  manager.applyUiState({ state: "recording", level: 0.4, elapsedMs: 900 });
+  assert.equal(built.length, afterSetup + 1);
+  assert.equal(built.at(-1)[0].label, "Parar e transcrever");
+
+  manager.setProfile("standard");
+  assert.equal(built.length, afterSetup + 1);
+  manager.applyUiState({ state: "processing" });
+  assert.equal(built.at(-1)[0].label, "Transcrevendo…");
+  manager.setRevisionMode("prompt");
+  assert.equal(built.length, afterSetup + 3);
+  manager.beginQuit();
+});

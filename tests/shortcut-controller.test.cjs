@@ -186,3 +186,21 @@ test("resultado tardio do ditado A não assume o controle do ditado B", async ()
   assert.equal(controller.ownsProcessing(generationA, targetA), false);
   assert.equal(controller.ownsProcessing(controller.generation, controller.target), true);
 });
+
+// A bandeja tira o foco do app do usuário: a janela em primeiro plano naquele
+// momento não é onde colar. Quem chama informa o destino e a captura é pulada.
+test("toggle com destino informado não captura a janela em foco", async () => {
+  let captures = 0;
+  const events = [];
+  const tray = { hwnd: null, isSelf: false };
+  const controller = new ToggleDictationController({
+    captureTarget: async () => { captures += 1; return { hwnd: "42" }; },
+    onStart: async (target) => events.push(target),
+    onStop: async () => {},
+  });
+  const result = await controller.toggle({ target: tray });
+  assert.equal(result.action, "start");
+  assert.equal(captures, 0);
+  assert.equal(events[0], tray);
+  assert.equal(controller.target, tray);
+});
