@@ -417,6 +417,39 @@ body {
   background: rgba(22, 22, 26, 0.9);
 }
 
+/* Recording hints. "Esc cancela" is quiet; the silent mic and the last
+   seconds before the duration limit use amber, dimming or tinting the bars so
+   the warning reads even at a glance. */
+.hint {
+  display: none;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  animation: notice-in 160ms ease both;
+}
+.capsule[data-state="recording"]:not([data-hint=""]) .hint {
+  display: inline-flex;
+}
+.capsule[data-hint="esc"] .hint {
+  color: #ffffffa8;
+}
+.capsule[data-hint="silent"] .hint,
+.capsule[data-hint="countdown"] .hint {
+  color: #f6b94a;
+}
+.capsule[data-hint="countdown"] .hint {
+  min-width: 26px;
+  font-variant-numeric: tabular-nums;
+}
+.capsule[data-hint="silent"] .wave {
+  opacity: 0.35;
+}
+.capsule[data-hint="countdown"] .wave i {
+  background: #f6b94a;
+}
+
 @keyframes notice-in {
   from {
     opacity: 0;

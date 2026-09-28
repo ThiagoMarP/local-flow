@@ -4,6 +4,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
+// The renderer's ES module dependency, loaded once for the vm context below.
+let realRecordingHint;
+test.before(async () => {
+  ({ recordingHint: realRecordingHint } = await import("../src/renderer/recording-hint.js"));
+});
+
 function deferred() {
   let resolve;
   let reject;
@@ -113,6 +119,7 @@ function createRenderer(options = {}) {
       },
       setInterval: () => 1,
       clearInterval() {},
+      localStorage: options.localStorage || new Map(Object.entries({})),
       setTimeout,
       clearTimeout,
     },
@@ -146,6 +153,7 @@ function createRenderer(options = {}) {
     startMeetingCapture: async () => {},
     stopMeetingCapture: async () => {},
     joinAndEncode: () => new Uint8Array(64),
+    recordingHint: (input) => realRecordingHint(input),
   });
 
   const source = fs.readFileSync(
@@ -163,6 +171,7 @@ function createRenderer(options = {}) {
       vm.runInContext("setLastMessage(testLastRecord)", context);
     },
     loadHistory() { return vm.runInContext("loadHistory()", context); },
+    evaluate(code) { return vm.runInContext(code, context); },
     get worklet() { return worklet; },
     get command() { return command; },
     get transcriptions() { return transcriptions; },
@@ -440,4 +449,41 @@ test("sucesso publica o aviso de colagem manual só quando não colou", async ()
     await renderer.element("#recordButton").dispatch("click");
     assert.equal(renderer.uiStates.at(-1).manualPaste, false);
   }
+});
+
+function fakeStorage(entries = {}) {
+  const map = new Map(Object.entries(entries));
+  return {
+    getItem: (key) => (map.has(key) ? map.get(key) : null),
+    setItem: (key, value) => map.set(key, String(value)),
+    map,
+  };
+}
+
+// Nas primeiras gravações a cápsula ensina que Esc cancela; depois de 20, não.
+test("ensina o Esc nas primeiras gravações e para depois do limite", async () => {
+  const storage = fakeStorage();
+  const renderer = createRenderer({ localStorage: storage });
+  await renderer.element("#recordButton").dispatch("click");
+  assert.equal(renderer.uiStates.at(-1).state, "recording");
+  assert.equal(renderer.uiStates.at(-1).hint, "esc");
+  assert.equal(storage.map.get("localFlow.escHintsShown"), "1");
+
+  const veteran = createRenderer({
+    localStorage: fakeStorage({ "localFlow.escHintsShown": "20" }),
+  });
+  await veteran.element("#recordButton").dispatch("click");
+  assert.equal(veteran.uiStates.at(-1).hint, null);
+});
+
+// O relógio de 250 ms publicava nível 0 entre as amostras do microfone e as
+// barras da cápsula despencavam quatro vezes por segundo.
+test("publicação do relógio mantém o último nível do microfone", async () => {
+  const renderer = createRenderer({ localStorage: fakeStorage() });
+  await renderer.element("#recordButton").dispatch("click");
+  addVoicedAudio(renderer);
+  const level = renderer.uiStates.findLast((state) => state.level > 0)?.level;
+  assert.ok(level > 0);
+  renderer.evaluate("updateTimer()");
+  assert.equal(renderer.uiStates.at(-1).level, level);
 });

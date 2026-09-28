@@ -5,6 +5,7 @@ const message = document.querySelector("#message");
 const timer = document.querySelector("#timer");
 const wave = document.querySelector("#wave");
 const noticeText = document.querySelector("#noticeText");
+const hint = document.querySelector("#hint");
 const discardButton = document.querySelector("#discardButton");
 const confirmButton = document.querySelector("#confirmButton");
 
@@ -27,10 +28,20 @@ function showsNotice(state) {
     (state.state === "success" && state.manualPaste);
 }
 
+// Extra line beside the bars while a dictation records.
+function hintText(state) {
+  if (state.hint === "esc") return "Esc cancela";
+  if (state.hint === "silent") return "Microfone sem som";
+  if (state.hint === "countdown") return `${Math.ceil((state.remainingMs || 0) / 1000)} s`;
+  return "";
+}
+
 function render(state) {
   current = state;
   capsule.dataset.state = state.state;
   capsule.dataset.manualPaste = String(Boolean(state.manualPaste));
+  capsule.dataset.hint = state.state === "recording" && state.hint ? state.hint : "";
+  hint.textContent = capsule.dataset.hint ? hintText(state) : "";
   message.textContent = state.message || "Local Flow";
   timer.textContent = formatDuration(state.elapsedMs || 0);
   noticeText.textContent = state.state === "error"

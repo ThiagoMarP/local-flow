@@ -280,6 +280,8 @@ class TestHarness {
         elapsedMs: state === "recording" ? 8400 : 0,
         level: 0.72,
         manualPaste: requested === "copied",
+        hint: process.env.LOCAL_FLOW_CAPSULE_HINT || null,
+        remainingMs: 7000,
       },
       { autoHide: false },
     );

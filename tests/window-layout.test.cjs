@@ -52,6 +52,8 @@ test("normaliza estado recebido pelo renderer", () => {
       elapsedMs: 0,
       level: 1,
       manualPaste: false,
+      hint: null,
+      remainingMs: 0,
     },
   );
 });
@@ -347,4 +349,16 @@ test("saída do mouse sem entrada não encurta o tempo do aviso", (t) => {
   t.mock.timers.tick(1000);
   assert.equal(sent.at(-1), "idle");
   manager.beginQuit();
+});
+
+// A dica da gravação só passa com os valores conhecidos; o tempo restante
+// nunca fica negativo.
+test("normaliza a dica da gravação e o tempo restante", () => {
+  const countdown = normalizeUiState({ state: "recording", hint: "countdown", remainingMs: 4200 });
+  assert.equal(countdown.hint, "countdown");
+  assert.equal(countdown.remainingMs, 4200);
+  assert.equal(normalizeUiState({ state: "recording", hint: "silent" }).hint, "silent");
+  assert.equal(normalizeUiState({ state: "recording", hint: "esc" }).hint, "esc");
+  assert.equal(normalizeUiState({ state: "recording", hint: "<b>" }).hint, null);
+  assert.equal(normalizeUiState({ state: "recording", remainingMs: -5 }).remainingMs, 0);
 });

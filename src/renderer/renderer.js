@@ -7,6 +7,7 @@ import {
   stopMeetingCapture,
 } from "./meeting-recorder.js";
 import { createMeetingsController } from "./meetings-controller.js";
+import { recordingHint } from "./recording-hint.js";
 
 const recordButton = document.querySelector("#recordButton");
 const stopButton = document.querySelector("#stopButton");
@@ -192,6 +193,25 @@ let deliveryCommitted = false;
 // paste failed). One-shot: only the publish that announces the success carries
 // it, so a later republish (e.g. a profile change) does not replay the notice.
 let deliveryNeedsManualPaste = false;
+// Last microphone level, so the 250 ms timer publish does not drop the capsule
+// bars to zero between level samples.
+let currentLevel = 0;
+let showEscHint = false;
+const ESC_HINT_KEY = "localFlow.escHintsShown";
+const ESC_HINT_RECORDINGS = 20;
+
+// "Esc cancela" is taught on the first recordings only; after that it would be
+// noise. A per-install convenience, so storage failures just skip the hint.
+function takeEscHint() {
+  try {
+    const shown = Number(window.localStorage.getItem(ESC_HINT_KEY)) || 0;
+    if (shown >= ESC_HINT_RECORDINGS) return false;
+    window.localStorage.setItem(ESC_HINT_KEY, String(shown + 1));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function reportDictationEvent(event) {
   window.localFlow.reportDictationEvent({ runId: activeRunId, ...event });
@@ -241,20 +261,29 @@ function isBusyState(value) {
 function publishUiState(overrides = {}) {
   const manualPaste = state === "success" && deliveryNeedsManualPaste;
   deliveryNeedsManualPaste = false;
-  // Main tracks dictation independently and preserves the meeting capsule
-  // while a meeting is being captured.
-  window.localFlow.updateUiState({
+  const recording = state === "recording";
+  const payload = {
     source: "dictation",
     state: capsuleState(state),
     message: statusElement.textContent,
     profile: profileSelect.value,
     runId: activeRunId,
-    elapsedMs:
-      state === "recording" ? Date.now() - recordingStartedAt : 0,
-    level: 0,
+    elapsedMs: recording ? Date.now() - recordingStartedAt : 0,
+    level: recording ? currentLevel : 0,
     manualPaste,
     ...overrides,
-  });
+  };
+  if (recording) {
+    Object.assign(payload, recordingHint({
+      elapsedMs: payload.elapsedMs,
+      limitMs: (settingsController.get()?.maxRecordingSeconds || 0) * 1000,
+      heardSound: maxPeak >= NO_SPEECH_PEAK,
+      showEscHint,
+    }));
+  }
+  // Main tracks dictation independently and preserves the meeting capsule
+  // while a meeting is being captured.
+  window.localFlow.updateUiState(payload);
 }
 
 function setStatus(nextState, message) {
@@ -489,6 +518,7 @@ async function startRecording(source = "manual") {
       // Square-root curve + gain: lifts a normal speaking volume into a lively
       // range instead of only reacting to loud speech, while silence stays low.
       const level = Math.min(1, Math.pow(peak, 0.5) * 2);
+      currentLevel = level;
       meterFill.style.width = `${Math.min(100, 4 + level * 96)}%`;
       const now = Date.now();
       if (now - lastLevelPublish > 80) {
@@ -505,6 +535,8 @@ async function startRecording(source = "manual") {
     silentGain.connect(audioContext.destination);
 
     recordingStartedAt = Date.now();
+    currentLevel = 0;
+    showEscHint = takeEscHint();
     timerElement.textContent = "00:00";
     timerInterval = window.setInterval(updateTimer, 250);
     setStatus("recording", "Ouvindo…");
