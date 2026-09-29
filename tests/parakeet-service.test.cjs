@@ -46,7 +46,8 @@ test("prepara WAV e chama o runtime oficial com o modelo local", async () => {
         assert.deepEqual(args.slice(0, 2), ["--quiet", "transcribe"]);
         assert.equal(args[3], "--model");
         assert.equal(args[4], modelPath);
-        assert.deepEqual(args.slice(5), ["--format", "text"]);
+        // O CLI é o plano B quando o servidor (GPU) falha: sempre na CPU.
+        assert.deepEqual(args.slice(5), ["--device", "cpu", "--format", "text"]);
         assert.deepEqual(await readFile(args[2]), wavBuffer);
         assert.equal(path.dirname(args[2]), options.cwd);
         jobDir = options.cwd;

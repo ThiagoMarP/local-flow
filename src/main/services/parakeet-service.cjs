@@ -234,6 +234,10 @@ async function transcribeParakeetWav({
         audioPath,
         "--model",
         modelPath,
+        // The CLI is the fallback when the warm server (GPU) fails, so it
+        // always runs on the CPU and a GPU problem never stops a dictation.
+        "--device",
+        "cpu",
         ...(withTimestamps ? ["--json"] : ["--format", "text"]),
       ],
       { cwd: jobDir, timeoutMs, signal },

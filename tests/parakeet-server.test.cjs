@@ -56,7 +56,7 @@ test("sobe o servidor sob demanda e reaproveita entre ditados", async () => {
     assert.equal(await server.transcribe(request()), "Olá.");
     assert.equal(runtime.spawns.length, 1);
     assert.deepEqual(runtime.spawns[0].args, [
-      "--quiet", "serve", "--asr-model", "m.gguf",
+      "--quiet", "serve", "--asr-model", "m.gguf", "--device", "auto",
       "--host", "127.0.0.1", "--port", "4321", "--no-ui",
     ]);
     assert.equal(
@@ -199,4 +199,41 @@ test("sem palavras, continua pedindo json e devolvendo só o texto", async () =>
   assert.equal(await server.transcribe(request()), "Olá.");
   assert.equal(runtime.requests[0].init.body.get("response_format"), "json");
   server.dispose();
+});
+
+// O servidor aquecido usa a GPU quando houver (5-6x mais rápido na Radeon
+// 890M). Drivers AMD antigos não têm a extensão de bfloat16 do Vulkan e o
+// dispositivo nem sobe; sem pedir bfloat16, o resto do Vulkan funciona.
+test("servidor usa a GPU disponível sem exigir bfloat16 do driver", async () => {
+  const runtime = fakeRuntime();
+  const server = createServer(runtime);
+  try {
+    await server.transcribe(request());
+    const { args, options } = runtime.spawns[0];
+    assert.deepEqual(args.slice(args.indexOf("--device"), args.indexOf("--device") + 2), ["--device", "auto"]);
+    assert.equal(options.env.GGML_VK_DISABLE_BFLOAT16, "1");
+  } finally {
+    server.dispose();
+  }
+});
+
+// Subir o servidor na GPU leva ~3 s (compilação de shaders). Aquecendo quando a
+// gravação começa, a subida acontece enquanto a pessoa fala.
+test("aquecer sobe o servidor uma vez e nunca lança erro", async () => {
+  const runtime = fakeRuntime();
+  const server = createServer(runtime);
+  try {
+    await server.prewarm("m.gguf");
+    await server.prewarm("m.gguf");
+    assert.equal(runtime.spawns.length, 1);
+    assert.equal(await server.transcribe(request()), "Olá.");
+    assert.equal(runtime.spawns.length, 1);
+  } finally {
+    server.dispose();
+  }
+
+  const broken = createServer(fakeRuntime({ exitOnStart: true }));
+  await broken.prewarm("m.gguf");
+  assert.equal(broken.available, false);
+  broken.dispose();
 });
