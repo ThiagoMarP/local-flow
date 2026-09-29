@@ -343,11 +343,13 @@ export function createSettingsController({
     );
   }
   revisionModeSelect.addEventListener("change", syncRevisionControls);
-  revisionEnabledInput.addEventListener("change", syncRevisionControls);
   navigator.mediaDevices?.addEventListener(
     "devicechange",
     refreshMicrophones,
   );
+
+  // The revision switch dims the mode and model fields right away.
+  revisionEnabledInput.addEventListener("change", syncRevisionControls);
 
   return {
     closeRevisionPicker: selectPickers.close,
