@@ -62,6 +62,7 @@ class WindowManager {
     // and a key of the last menu built so unchanged state does not rebuild it.
     this.trayActions = {};
     this.revisionMode = "literal";
+    this.revisionEnabled = true;
     this.revisionModes = [];
     this.trayMenuKey = null;
     this.dashboardWindow = null;
@@ -295,6 +296,7 @@ class WindowManager {
       shortcut: this.shortcut,
       repaste: this.repasteStatus,
       revisionMode: this.revisionMode,
+      revisionEnabled: this.revisionEnabled,
       revisionModes: this.revisionModes,
     };
     // applyUiState runs on every microphone level sample; only rebuild when
@@ -311,6 +313,7 @@ class WindowManager {
             toggleDictation: this.trayActions.toggleDictation || noop,
             copyLast: this.trayActions.copyLast || noop,
             setRevisionMode: this.trayActions.setRevisionMode || noop,
+            setRevisionEnabled: this.trayActions.setRevisionEnabled || noop,
             showDashboard: () => this.showDashboard(),
             toggleDashboard: () => {
               if (this.dashboardWindow?.isVisible()) this.hideDashboard();
@@ -333,6 +336,11 @@ class WindowManager {
   }
 
   // `modes` ({ value, label }[]) only needs passing once.
+  setRevisionEnabled(enabled) {
+    this.revisionEnabled = enabled !== false;
+    this.rebuildTrayMenu();
+  }
+
   setRevisionMode(mode, modes) {
     this.revisionMode = mode;
     if (modes) this.revisionModes = modes;

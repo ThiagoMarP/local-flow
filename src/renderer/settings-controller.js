@@ -12,6 +12,7 @@ export function createSettingsController({
   meetingProfileSelect,
   meetingSummaryModelSelect,
   maxDurationSelect,
+  revisionEnabledInput,
   revisionModeSelect,
   revisionModelSelect,
   writingProfileSelect,
@@ -37,6 +38,7 @@ export function createSettingsController({
     meetingProfileSelect,
     meetingSummaryModelSelect,
     maxDurationSelect,
+    revisionEnabledInput,
     revisionModeSelect,
     revisionModelSelect,
     writingProfileSelect,
@@ -100,6 +102,7 @@ export function createSettingsController({
       meetingProfile: meetingProfileSelect.value,
       meetingSummaryModel: meetingSummaryModelSelect.value,
       maxRecordingSeconds: Number(maxDurationSelect.value),
+      revisionEnabled: revisionEnabledInput.checked,
       revisionMode: revisionModeSelect.value,
       revisionModel: revisionModelSelect.value,
       writingProfile: writingProfileSelect.value,
@@ -173,6 +176,7 @@ export function createSettingsController({
       }),
     );
     revisionModeSelect.value = settings.revisionMode;
+    revisionEnabledInput.checked = settings.revisionEnabled !== false;
     writingProfileSelect.replaceChildren(
       ...settings.allowedWritingProfiles.map((item) => {
         const option = document.createElement("option");
@@ -224,10 +228,21 @@ export function createSettingsController({
   }
 
   function syncRevisionControls() {
+    const enabled = revisionEnabledInput.checked;
+    revisionModeSelect.disabled = busy || !enabled;
     revisionModelSelect.disabled =
       busy ||
+      !enabled ||
       !revisionAvailable ||
       ["literal", "fast"].includes(revisionModeSelect.value);
+    revisionEnabledInput.closest(".settings-group")?.classList.toggle("is-off", !enabled);
+    if (!enabled) {
+      ollamaStatus.classList.remove("error");
+      ollamaStatus.lastElementChild.textContent =
+        "Desligada · o texto é colado como foi transcrito";
+      selectPickers.sync();
+      return;
+    }
     const quick = revisionModeSelect.value === "fast";
     ollamaStatus.classList.toggle("error", !revisionAvailable && !quick);
     ollamaStatus.lastElementChild.textContent = quick
@@ -333,6 +348,9 @@ export function createSettingsController({
     refreshMicrophones,
   );
 
+  // The revision switch dims the mode and model fields right away.
+  revisionEnabledInput.addEventListener("change", syncRevisionControls);
+
   return {
     closeRevisionPicker: selectPickers.close,
     syncSelectPickers: selectPickers.sync,
@@ -345,6 +363,12 @@ export function createSettingsController({
     addReplacementRule,
     // A mode picked elsewhere (the tray) and already saved by main: reflect it
     // without saving again.
+    // Switched from the tray and already saved by main: reflect it only.
+    applyRevisionEnabled(enabled) {
+      revisionEnabledInput.checked = enabled !== false;
+      if (current) current = { ...current, revisionEnabled: revisionEnabledInput.checked };
+      syncRevisionControls();
+    },
     applyRevisionMode(mode) {
       if (![...revisionModeSelect.options].some((option) => option.value === mode)) return;
       revisionModeSelect.value = mode;

@@ -84,6 +84,7 @@ function createRenderer(options = {}) {
     onMeetingStatus() {},
     onNavigate() {},
     onRevisionModeChanged() {},
+    onRevisionEnabledChanged() {},
     updateUiState(state) { uiStates.push(state); },
     reportDictationEvent(event) {
       events.push(event);
@@ -487,4 +488,24 @@ test("publicação do relógio mantém o último nível do microfone", async () 
   assert.ok(level > 0);
   renderer.evaluate("updateTimer()");
   assert.equal(renderer.uiStates.at(-1).level, level);
+});
+
+// Desligar a revisão vale no próximo ditado, mesmo antes do salvamento
+// automático: o painel manda o estado do switch junto com o áudio.
+test("ditado leva o estado do switch da revisão", async () => {
+  for (const checked of [false, true]) {
+    let payload;
+    const renderer = createRenderer({
+      transcribe: async (sent) => {
+        payload = sent;
+        return { text: "Oi", autoPasted: true };
+      },
+    });
+    renderer.element("#revisionEnabledInput").checked = checked;
+    await renderer.element("#recordButton").dispatch("click");
+    addVoicedAudio(renderer);
+    renderer.close.resolve();
+    await renderer.element("#stopButton").dispatch("click");
+    assert.equal(payload.revisionEnabled, checked);
+  }
 });

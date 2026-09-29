@@ -31,6 +31,7 @@ function buildTrayTemplate({
   shortcut,
   repaste,
   revisionMode,
+  revisionEnabled = true,
   revisionModes,
   actions,
 }) {
@@ -38,13 +39,23 @@ function buildTrayTemplate({
     dictationItem(dictationState, actions.toggleDictation),
     { label: "Copiar última transcrição", click: actions.copyLast },
     {
-      label: "Modo de revisão",
-      submenu: revisionModes.map(({ value, label }) => ({
-        label,
-        type: "radio",
-        checked: value === revisionMode,
-        click: () => actions.setRevisionMode(value),
-      })),
+      label: revisionEnabled ? "Modo de revisão" : "Modo de revisão (desligada)",
+      submenu: [
+        {
+          label: "Ligada",
+          type: "checkbox",
+          checked: revisionEnabled,
+          click: () => actions.setRevisionEnabled(!revisionEnabled),
+        },
+        { type: "separator" },
+        ...revisionModes.map(({ value, label }) => ({
+          label,
+          type: "radio",
+          checked: value === revisionMode,
+          enabled: revisionEnabled,
+          click: () => actions.setRevisionMode(value),
+        })),
+      ],
     },
     { type: "separator" },
     { label: "Abrir Local Flow", click: actions.showDashboard },

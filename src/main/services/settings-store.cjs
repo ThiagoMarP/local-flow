@@ -74,6 +74,9 @@ const DEFAULT_SETTINGS = Object.freeze({
   // clipboard entry instead.
   restoreClipboard: false,
   maxRecordingSeconds: 120,
+  // Switch in Settings → Revisão local. Off pastes the text as transcribed,
+  // without the AI step; revisionMode is kept for when it is turned back on.
+  revisionEnabled: true,
   revisionMode: "literal",
   revisionModel: DEFAULT_MODEL,
   revisionTimeoutMs: DEFAULT_TIMEOUT_MS,
@@ -157,6 +160,10 @@ function normalizeSettings(value = {}) {
         ? value.restoreClipboard
         : DEFAULT_SETTINGS.restoreClipboard,
     maxRecordingSeconds,
+    revisionEnabled:
+      typeof value.revisionEnabled === "boolean"
+        ? value.revisionEnabled
+        : DEFAULT_SETTINGS.revisionEnabled,
     revisionMode: REVISION_MODES.has(value.revisionMode)
       ? value.revisionMode
       : DEFAULT_SETTINGS.revisionMode,

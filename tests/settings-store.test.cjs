@@ -128,3 +128,14 @@ test("expõe as opções e o rótulo do atalho de colar a última", async () => 
     ["Ctrl+Alt+V", "Ctrl+Alt+B", "Ctrl+Alt+Shift+V", "Desativado"],
   );
 });
+
+// Switch da Revisão local: desligado cola o texto como foi transcrito, sem IA,
+// e o modo escolhido fica guardado para quando religar.
+test("revisão local vem ligada e só aceita booleano", () => {
+  assert.equal(DEFAULT_SETTINGS.revisionEnabled, true);
+  assert.equal(normalizeSettings({}).revisionEnabled, true);
+  assert.equal(normalizeSettings({ revisionEnabled: false }).revisionEnabled, false);
+  assert.equal(normalizeSettings({ revisionEnabled: "não" }).revisionEnabled, true);
+  const off = normalizeSettings({ revisionEnabled: false, revisionMode: "prompt" });
+  assert.equal(off.revisionMode, "prompt");
+});

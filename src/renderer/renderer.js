@@ -65,6 +65,7 @@ const meetingSummaryModelSelect = document.querySelector(
   "#meetingSummaryModelSelect",
 );
 const maxDurationSelect = document.querySelector("#maxDurationSelect");
+const revisionEnabledInput = document.querySelector("#revisionEnabledInput");
 const revisionModeSelect = document.querySelector(
   "#revisionModeSelect",
 );
@@ -105,6 +106,7 @@ const settingsController = createSettingsController({
   meetingProfileSelect,
   meetingSummaryModelSelect,
   maxDurationSelect,
+  revisionEnabledInput,
   revisionModeSelect,
   revisionModelSelect,
   writingProfileSelect,
@@ -695,6 +697,7 @@ async function stopAndTranscribe(source = recordingSource) {
       audio: wav,
       profile: profileSelect.value,
       vocabulary,
+      revisionEnabled: revisionEnabledInput.checked,
       revisionMode: revisionModeSelect.value,
       revisionModel: revisionModelSelect.value,
       writingProfile: writingProfileSelect.value,
@@ -1116,6 +1119,9 @@ for (const button of document.querySelectorAll(".section-nav [data-section]")) {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
+window.localFlow.onRevisionEnabledChanged((enabled) => {
+  settingsController.applyRevisionEnabled(enabled);
+});
 window.localFlow.onRevisionModeChanged((mode) => {
   settingsController.applyRevisionMode(mode);
 });

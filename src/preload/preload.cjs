@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("localFlow", {
     runId,
     profile,
     vocabulary,
+    revisionEnabled,
     revisionMode,
     revisionModel,
     writingProfile,
@@ -27,6 +28,7 @@ contextBridge.exposeInMainWorld("localFlow", {
       runId,
       profile,
       vocabulary,
+      revisionEnabled,
       revisionMode,
       revisionModel,
       writingProfile,
@@ -59,6 +61,11 @@ contextBridge.exposeInMainWorld("localFlow", {
   capsuleAction: (action) => ipcRenderer.invoke("capsule:action", action),
   capsuleHover: (hovering) =>
     ipcRenderer.send("capsule:hover", Boolean(hovering)),
+  onRevisionEnabledChanged: (listener) => {
+    const handler = (_event, enabled) => listener(enabled);
+    ipcRenderer.on("settings:revision-enabled", handler);
+    return () => ipcRenderer.removeListener("settings:revision-enabled", handler);
+  },
   onRevisionModeChanged: (listener) => {
     const handler = (_event, mode) => listener(mode);
     ipcRenderer.on("settings:revision-mode", handler);

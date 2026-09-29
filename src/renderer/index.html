@@ -365,9 +365,19 @@
           </section>
 
           <section class="settings-group" id="settingsRevision">
-            <div class="settings-group-head">
-              <h2>Revisão local</h2>
-              <p>Como a IA local trata o texto antes de colar.</p>
+            <div class="settings-group-head has-switch">
+              <div>
+                <h2>Revisão local</h2>
+                <p>Como a IA local trata o texto antes de colar.</p>
+              </div>
+              <input
+                id="revisionEnabledInput"
+                type="checkbox"
+                role="switch"
+                checked
+                aria-label="Revisão local ligada"
+                title="Desligada, o texto é colado como foi transcrito, sem esperar a IA"
+              />
             </div>
             <div class="field-grid">
               <label class="field revision-mode-field">
