@@ -99,6 +99,20 @@ class ParakeetServer {
     }
   }
 
+  // Starting on the GPU takes ~3 s (shader compilation). Called when a
+  // recording begins, so the start overlaps the speech instead of delaying the
+  // transcription. Never throws: a failed start already marks the server
+  // unavailable and dictation falls back to the CLI.
+  async prewarm(modelPath) {
+    if (!this.available) return;
+    try {
+      await this.ensureStarted(modelPath);
+      this.scheduleIdleStop();
+    } catch {
+      // Reported through onEvent by start(); nothing else to do here.
+    }
+  }
+
   async ensureStarted(modelPath) {
     if (this.disposed) throw new Error("O servidor Parakeet foi encerrado.");
     if (this.current?.modelPath === modelPath && !this.current.exited) {
@@ -124,6 +138,10 @@ class ParakeetServer {
         "serve",
         "--asr-model",
         modelPath,
+        // GPU when there is one (Vulkan on the Radeon 890M is 5-6x faster
+        // than the CPU), CPU otherwise.
+        "--device",
+        "auto",
         "--host",
         "127.0.0.1",
         "--port",
@@ -135,7 +153,14 @@ class ParakeetServer {
         stdio: "ignore",
         // The docs recommend the environment over argv so the key does not
         // show up in process listings.
-        env: { ...process.env, NEMO_SPEECH_HTTP_API_KEY: apiKey },
+        env: {
+          ...process.env,
+          NEMO_SPEECH_HTTP_API_KEY: apiKey,
+          // AMD drivers before 2025 lack the Vulkan bfloat16 extension, and
+          // ggml then fails to create the device at all. Not asking for
+          // bfloat16 keeps the rest of Vulkan (fp16 included) working.
+          GGML_VK_DISABLE_BFLOAT16: "1",
+        },
       },
     );
     const server = {

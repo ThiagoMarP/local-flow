@@ -18,6 +18,7 @@ const { cleanOldEntries } = require("./services/housekeeping.cjs");
 const { LoginItemService } = require("./services/login-item-service.cjs");
 const { ModelInstaller } = require("./services/model-installer.cjs");
 const { ParakeetServer } = require("./services/parakeet-server.cjs");
+const { PARAKEET_MODEL_FILE } = require("./services/parakeet-service.cjs");
 const { PrivacyLogger } = require("./services/privacy-logger.cjs");
 const { RevisionService } = require("./services/revision-service.cjs");
 const { detectRunMode } = require("./services/run-mode.cjs");
@@ -536,8 +537,17 @@ app.whenReady().then(async () => {
     getActiveProfile: () => activeProfile,
     setActiveProfile: (profile) => { activeProfile = profile; },
   });
+  // The Parakeet server starts on the GPU in ~3 s; start it as the recording
+  // begins so it is ready when the transcription is. Only on the transition:
+  // recording updates arrive up to 12 times a second.
+  let lastDictationState = null;
   ipcMain.on("ui:update-state", (_event, payload) => {
     if (payload?.source === "dictation") {
+      if (payload.state === "recording" && lastDictationState !== "recording" &&
+        activeProfile === "parakeet") {
+        parakeetServer.prewarm(path.join(appPaths.modelsDir, PARAKEET_MODEL_FILE));
+      }
+      lastDictationState = payload.state;
       dictation.onRendererState(payload);
       if (meetings.ownsCapsule()) return;
     }

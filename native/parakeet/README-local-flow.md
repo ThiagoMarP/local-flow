@@ -1,13 +1,24 @@
 # NeMo-Speech.cpp para o Local Flow
 
 Este diretório contém a release oficial **v0.1.0** do runtime de inferência da
-NVIDIA para Windows x86_64 CPU.
+NVIDIA para Windows x86_64 com backend **Vulkan** (GPU), que também roda na CPU.
 
 - Arquivo de origem:
-  <https://github.com/NVIDIA/NeMo-Speech.cpp/releases/download/v0.1.0/nemo-speech-0.1.0-windows-x86_64-cpu.zip>
+  <https://github.com/NVIDIA/NeMo-Speech.cpp/releases/download/v0.1.0/nemo-speech-0.1.0-windows-x86_64-vulkan.zip>
 - SHA-256 do ZIP publicado pela NVIDIA:
-  `5e4ea81046012edcd77fd8848de8eefb5a4ba38cc26f52eb544ab184695a75d6`
-- Executável: `bin/nemo-speech.exe` (as DLLs necessárias ficam em `bin/`).
+  `b5e7b04a637da4eb25a60253e2db65774998e8dfb48c08b4db763009b82ac7ac`
+- Executável: `bin/nemo-speech.exe` (as DLLs necessárias ficam em `bin/`,
+  incluindo `ggml-vulkan.dll`).
+
+Como o app usa:
+
+- O servidor aquecido roda com `--device auto` (GPU quando houver) e
+  `GGML_VK_DISABLE_BFLOAT16=1`: drivers AMD antigos não têm a extensão de
+  bfloat16 do Vulkan e, sem essa variável, o dispositivo nem sobe.
+- O CLI é o plano B quando o servidor falha e roda sempre com `--device cpu`.
+- Medido na Radeon 890M (driver de jan/2025): 5,2x mais rápido em ditados
+  curtos e 6,1x em janelas de 2 min de reunião, com texto idêntico ao da CPU.
+  Na CPU, este build tem o mesmo desempenho do build `cpu` anterior.
 - Licença do runtime e avisos de terceiros: `share/licenses/nemo-speech/`.
 
 O modelo é baixado separadamente pelo aplicativo:
