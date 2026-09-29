@@ -54,7 +54,9 @@ class ParakeetServer {
     return !this.startFailed && !this.disposed;
   }
 
-  async transcribe({ wavBuffer, modelPath, timeoutMs = 120000, signal }) {
+  // `withWords` asks for per-word timestamps (verbose_json), which meetings
+  // need to interleave speakers; it then resolves to { text, words }.
+  async transcribe({ wavBuffer, modelPath, timeoutMs = 120000, signal, withWords = false }) {
     throwIfAborted(signal);
     const server = await this.ensureStarted(modelPath);
     throwIfAborted(signal);
@@ -66,7 +68,7 @@ class ParakeetServer {
     try {
       const form = new FormData();
       form.append("file", new Blob([wavBuffer], { type: "audio/wav" }), "audio.wav");
-      form.append("response_format", "json");
+      form.append("response_format", withWords ? "verbose_json" : "json");
       const response = await this.fetchImpl(
         `${server.baseUrl}/v1/audio/transcriptions`,
         {
@@ -80,7 +82,9 @@ class ParakeetServer {
         throw new Error(`O servidor Parakeet respondeu HTTP ${response.status}.`);
       }
       const payload = await response.json();
-      return typeof payload?.text === "string" ? payload.text : "";
+      const text = typeof payload?.text === "string" ? payload.text : "";
+      if (!withWords) return text;
+      return { text, words: Array.isArray(payload?.words) ? payload.words : [] };
     } catch (error) {
       if (signal?.aborted) throw createAbortError();
       if (requestSignal.aborted) {

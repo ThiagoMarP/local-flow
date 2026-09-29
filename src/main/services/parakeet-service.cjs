@@ -92,6 +92,41 @@ function runParakeetCli(executable, args, { cwd, timeoutMs = 120000, signal } = 
   });
 }
 
+const SENTENCE_END = /[.!?…]["')\]]*$/;
+const MAX_PAUSE_MS = 900;
+const MAX_SEGMENT_MS = 20_000;
+
+// Parakeet reports words with start/end in seconds. Meetings interleave the two
+// channels by time using Whisper-like segments, so group the words into
+// segments in milliseconds: end one at a sentence end, a long pause, or when it
+// would grow past MAX_SEGMENT_MS.
+function wordsToSegments(words) {
+  if (!Array.isArray(words)) return [];
+  const segments = [];
+  let current = null;
+  for (const item of words) {
+    const text = String(item?.word ?? "").trim();
+    const from = Math.round(Number(item?.start) * 1000);
+    const to = Math.round(Number(item?.end) * 1000);
+    if (!text || !Number.isFinite(from) || !Number.isFinite(to)) continue;
+    if (current && (from - current.to > MAX_PAUSE_MS || to - current.from > MAX_SEGMENT_MS)) {
+      segments.push(current);
+      current = null;
+    }
+    if (!current) current = { from, to, text };
+    else {
+      current.to = to;
+      current.text += ` ${text}`;
+    }
+    if (SENTENCE_END.test(text)) {
+      segments.push(current);
+      current = null;
+    }
+  }
+  if (current) segments.push(current);
+  return segments;
+}
+
 async function transcribeParakeetWav({
   projectRoot,
   parakeetCli: parakeetCliOverride,
@@ -100,6 +135,7 @@ async function transcribeParakeetWav({
   profile = PARAKEET_PROFILE,
   timeoutMs = 120000,
   allowEmpty = false,
+  withTimestamps = false,
   processRunner = runParakeetCli,
   server,
   onServerFallback = () => {},
@@ -139,14 +175,14 @@ async function transcribeParakeetWav({
   }
   throwIfAborted(signal);
 
-  const finish = (rawText, startedAt) => {
+  const finish = (rawText, startedAt, words) => {
     const text = stripNonSpeech(rawText);
     if (!text && !allowEmpty) {
       throw new Error("O Parakeet não reconheceu fala no áudio.");
     }
     return {
       text,
-      segments: [],
+      segments: withTimestamps ? wordsToSegments(words) : [],
       profile,
       durationSeconds: wavInfo.durationSeconds,
       elapsedMs: Date.now() - startedAt,
@@ -156,15 +192,24 @@ async function transcribeParakeetWav({
   if (server?.available) {
     const startedAt = Date.now();
     let rawText;
+    let words;
     try {
-      rawText = await server.transcribe({ wavBuffer, modelPath, timeoutMs, signal });
+      const response = await server.transcribe({
+        wavBuffer,
+        modelPath,
+        timeoutMs,
+        signal,
+        withWords: withTimestamps,
+      });
+      if (withTimestamps) ({ text: rawText, words } = response);
+      else rawText = response;
     } catch (error) {
       if (error?.name === "AbortError" || signal?.aborted) throw error;
       // The warm server is only a speed-up; the CLI below still transcribes.
       onServerFallback(error);
     }
     throwIfAborted(signal);
-    if (rawText !== undefined) return finish(rawText, startedAt);
+    if (rawText !== undefined) return finish(rawText, startedAt, words);
   }
 
   const tempRoot = path.join(os.tmpdir(), "local-flow");
@@ -180,13 +225,23 @@ async function transcribeParakeetWav({
     throwIfAborted(signal);
     // The official NeMo-Speech.cpp CLI writes plain results to stdout and
     // diagnostics to stderr. Parakeet TDT is offline-only, so do not use --stream.
+    // --json adds per-word timestamps (meetings); plain text otherwise.
     const stdout = await processRunner(
       parakeetCli,
-      ["--quiet", "transcribe", audioPath, "--model", modelPath, "--format", "text"],
+      [
+        "--quiet",
+        "transcribe",
+        audioPath,
+        "--model",
+        modelPath,
+        ...(withTimestamps ? ["--json"] : ["--format", "text"]),
+      ],
       { cwd: jobDir, timeoutMs, signal },
     );
     throwIfAborted(signal);
-    return finish(stdout, startedAt);
+    if (!withTimestamps) return finish(stdout, startedAt);
+    const parsed = JSON.parse(stdout);
+    return finish(String(parsed?.text || ""), startedAt, parsed?.words);
   } finally {
     await rm(jobDir, { recursive: true, force: true });
   }
@@ -198,4 +253,5 @@ module.exports = {
   getParakeetPaths,
   runParakeetCli,
   transcribeParakeetWav,
+  wordsToSegments,
 };
