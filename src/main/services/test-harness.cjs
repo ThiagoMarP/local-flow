@@ -36,6 +36,14 @@ class TestHarness {
         );
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
+      // Clicks one element (CSS selector) before the capture, to check an
+      // interaction's result on screen.
+      if (process.env.LOCAL_FLOW_CAPTURE_CLICK) {
+        await window.webContents.executeJavaScript(
+          `document.querySelector(${JSON.stringify(process.env.LOCAL_FLOW_CAPTURE_CLICK)})?.click()`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
       if (process.env.LOCAL_FLOW_SETTINGS_PREVIEW === "1") {
         await window.webContents.executeJavaScript(
           "new Promise((resolve) => { const tick = () => { if (document.querySelector('#revisionModeTrigger')) resolve(); else setTimeout(tick, 50); }; tick(); }).then(() => { document.querySelector('[data-page=\"settings\"].nav-item')?.click(); document.querySelector('#revisionModeTrigger')?.scrollIntoView({block:'center'}); })",
