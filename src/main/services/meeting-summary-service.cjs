@@ -16,6 +16,28 @@ const DEFAULT_ENDPOINT = "http://127.0.0.1:11434";
 const DEFAULT_MODEL = "qwen2.5:3b";
 const DEFAULT_TIMEOUT_MS = 45000;
 
+// A meeting transcript can be long: a fixed 8192-token context silently cut
+// the start of a ~40 min meeting, and a fixed 45 s limit failed it even on a
+// 3B model. Size both from the transcript (pt-BR runs ~3 chars per token;
+// estimating low only makes the context a bit larger). Summaries run in the
+// background, so a long wait is acceptable.
+const CHARS_PER_TOKEN = 3;
+const PROMPT_AND_OUTPUT_TOKENS = 2500;
+const MIN_CONTEXT = 8192;
+const MAX_CONTEXT = 32768;
+const BASE_TIMEOUT_MS = 90000;
+const TIMEOUT_PER_TOKEN_MS = 25;
+const MAX_TIMEOUT_MS = 15 * 60 * 1000;
+
+function summaryBudget(text) {
+  const tokens = Math.ceil(String(text || "").length / CHARS_PER_TOKEN);
+  const needed = Math.ceil((tokens + PROMPT_AND_OUTPUT_TOKENS) / 1024) * 1024;
+  return {
+    numCtx: Math.max(MIN_CONTEXT, Math.min(MAX_CONTEXT, needed)),
+    timeoutMs: Math.min(MAX_TIMEOUT_MS, BASE_TIMEOUT_MS + tokens * TIMEOUT_PER_TOKEN_MS),
+  };
+}
+
 const SYSTEM_PROMPT = [
   "Você é um assistente executivo sênior especializado em analisar transcrições de reuniões e extrair informações acionáveis de forma clara e objetiva.",
   "A transcrição vem com falas rotuladas: [Você] é o usuário; [Chamada] são as outras pessoas da conversa.",
@@ -81,7 +103,7 @@ class MeetingSummaryService {
     this.fetch = fetchImpl;
     this.endpoint = normalizeEndpoint(endpoint);
     this.defaultModel = normalizeModel(defaultModel);
-    this.timeoutMs = Math.max(1000, Math.min(120000, timeoutMs));
+    this.timeoutMs = Math.max(1000, Math.min(MAX_TIMEOUT_MS, timeoutMs));
   }
 
   fallback(reason, model, startedAt) {
@@ -104,10 +126,11 @@ class MeetingSummaryService {
     const normalizedModel = normalizeModel(model, this.defaultModel);
     if (!text) return this.fallback("empty-input", normalizedModel, startedAt);
 
+    const budget = summaryBudget(text);
     const controller = new AbortController();
     const timer = setTimeout(
       () => controller.abort(),
-      Math.max(1000, Math.min(120000, timeoutMs)),
+      Math.min(MAX_TIMEOUT_MS, Math.max(1000, timeoutMs, budget.timeoutMs)),
     );
     try {
       const response = await this.fetch(`${this.endpoint}/api/generate`, {
@@ -120,7 +143,9 @@ class MeetingSummaryService {
           prompt: `Transcrição da reunião:\n<transcricao>\n${text}\n</transcricao>`,
           stream: false,
           keep_alive: "5m",
-          options: { temperature: 0.2, top_p: 0.9, num_ctx: 8192 },
+          // Thinking models (Qwen3.5) would reason first and take far longer.
+          think: false,
+          options: { temperature: 0.2, top_p: 0.9, num_ctx: budget.numCtx },
         }),
       });
       if (!response.ok) {
@@ -157,4 +182,5 @@ module.exports = {
   DEFAULT_TIMEOUT_MS,
   MeetingSummaryService,
   cleanMarkdown,
+  summaryBudget,
 };
