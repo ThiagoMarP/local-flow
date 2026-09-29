@@ -989,14 +989,31 @@ textarea:focus {
 
 /* Transcript as speech turns: who spoke (Você = own mic, Chamada = system
    audio) and when. The label color is the only speaker cue besides the text. */
+/* A fixed-height box that scrolls on its own, so a long meeting does not
+   push the rest of the list far down the page. */
 .meeting-turns {
   display: grid;
+  align-content: start;
   gap: 2px;
+  max-height: 340px;
   margin: 10px 0;
   padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
   border-radius: 10px;
   background: #00000033;
   list-style: none;
+}
+
+.meeting-turns::-webkit-scrollbar {
+  width: 10px;
+}
+
+.meeting-turns::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #ffffff26 padding-box;
 }
 
 .meeting-turn {
