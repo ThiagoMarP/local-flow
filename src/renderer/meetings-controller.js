@@ -237,7 +237,7 @@ export function createMeetingsController({ listEl, countEl, searchEl }) {
             : meeting.hasSummary
               ? "com resumo"
               : meeting.hasTranscript
-                ? "sem resumo"
+                ? null
                 : "sem transcrição",
     );
     if (PROFILE_LABELS[meeting.profile]) bits.push(PROFILE_LABELS[meeting.profile]);
@@ -249,7 +249,7 @@ export function createMeetingsController({ listEl, countEl, searchEl }) {
     if (meeting.interrupted) {
       bits.push(meeting.state === "done" ? "recuperada" : "interrompida");
     }
-    meta.textContent = bits.join(" · ");
+    meta.textContent = bits.filter(Boolean).join(" · ");
     info.append(date, meta);
 
     const actions = document.createElement("div");
@@ -331,19 +331,23 @@ export function createMeetingsController({ listEl, countEl, searchEl }) {
         : meeting.state === "processing"
           ? "Processando transcrição e resumo…"
           : meeting.hasTranscript
-            ? "Sem resumo. Se o Ollama estava fechado quando a reunião foi processada, gere agora."
+            ? "Sem resumo"
             : meeting.interrupted
               ? "A gravação foi interrompida. O áudio foi preservado no disco."
               : "Transcrição indisponível. O áudio da reunião foi salvo no disco.";
-      summary.append(note);
+      // "Sem resumo" on the left, "Gerar resumo" on the right of the same line.
+      const row = document.createElement("div");
+      row.className = "meeting-summary-row";
+      row.append(note);
       if (canSummarize(meeting)) {
         const generate = document.createElement("button");
         generate.type = "button";
-        generate.className = "button primary tiny meeting-generate";
+        generate.className = "button secondary tiny";
         generate.textContent = "Gerar resumo";
         generate.addEventListener("click", () => generateSummary(meeting, generate, "Gerar resumo"));
-        summary.append(generate);
+        row.append(generate);
       }
+      summary.append(row);
     }
     card.append(summary);
 

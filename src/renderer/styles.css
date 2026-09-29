@@ -1043,8 +1043,11 @@ textarea:focus {
   word-break: break-word;
 }
 
-.meeting-generate {
-  margin-top: 10px;
+.meeting-summary-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .meeting-summary-error {
