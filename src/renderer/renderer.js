@@ -75,11 +75,11 @@ const ollamaStatus = document.querySelector("#ollamaStatus");
 const writingProfileSelect = document.querySelector(
   "#writingProfileSelect",
 );
-const replacementRulesInput = document.querySelector(
-  "#replacementRulesInput",
+const replacementRulesTable = document.querySelector(
+  "#replacementRulesTable",
 );
-const snippetRulesInput = document.querySelector(
-  "#snippetRulesInput",
+const snippetRulesTable = document.querySelector(
+  "#snippetRulesTable",
 );
 const autoPasteInput = document.querySelector("#autoPasteInput");
 const restoreClipboardInput = document.querySelector(
@@ -108,8 +108,10 @@ const settingsController = createSettingsController({
   revisionModeSelect,
   revisionModelSelect,
   writingProfileSelect,
-  replacementRulesInput,
-  snippetRulesInput,
+  replacementRulesTable,
+  snippetRulesTable,
+  ruleTestInput: document.querySelector("#ruleTestInput"),
+  ruleTestOutput: document.querySelector("#ruleTestOutput"),
   autoPasteInput,
   restoreClipboardInput,
   launchAtLoginInput,

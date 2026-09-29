@@ -1,3 +1,5 @@
+const { PersonalizationService } = require("./services/personalization-service.cjs");
+
 // IPC for the dashboard that is not dictation or meetings: runtime status,
 // history, settings, clipboard and window visibility.
 function registerAppIpc({
@@ -115,6 +117,16 @@ function registerAppIpc({
       throw error;
     }
   });
+
+  // Settings "Testar as regras": same service a dictation uses.
+  const personalization = new PersonalizationService();
+  ipcMain.handle("personalization:preview", (_event, payload) =>
+    personalization.preview({
+      text: payload?.text,
+      replacements: payload?.replacements,
+      snippets: payload?.snippets,
+    }),
+  );
 
   ipcMain.handle("settings:reset", async () => {
     const previous = settingsStore.get();

@@ -1,5 +1,6 @@
 import { createSelectPickers } from "./select-picker.js";
 import { appendReplacementRule } from "./replacement-rule.js";
+import { createRuleTable } from "./rule-table.js";
 
 export function createSettingsController({
   profileSelect,
@@ -15,8 +16,10 @@ export function createSettingsController({
   revisionModeSelect,
   revisionModelSelect,
   writingProfileSelect,
-  replacementRulesInput,
-  snippetRulesInput,
+  replacementRulesTable,
+  snippetRulesTable,
+  ruleTestInput,
+  ruleTestOutput,
   autoPasteInput,
   restoreClipboardInput,
   launchAtLoginInput,
@@ -40,8 +43,6 @@ export function createSettingsController({
     revisionModeSelect,
     revisionModelSelect,
     writingProfileSelect,
-    replacementRulesInput,
-    snippetRulesInput,
     autoPasteInput,
     restoreClipboardInput,
     launchAtLoginInput,
@@ -58,31 +59,74 @@ export function createSettingsController({
     controls.filter((control) => control instanceof HTMLSelectElement),
   );
 
-  function parseRules(value, sourceKey, targetKey) {
-    return value
-      .split(/\r?\n/)
-      .map((line) => {
-        const separator = line.indexOf("=>");
-        if (separator < 0) return null;
-        const source = line.slice(0, separator).trim();
-        const target = line
-          .slice(separator + 2)
-          .trim()
-          .replaceAll("\\n", "\n");
-        return source
-          ? { [sourceKey]: source, [targetKey]: target }
-          : null;
-      })
-      .filter(Boolean);
+  const replacementTable = createRuleTable({
+    container: replacementRulesTable,
+    sourceKey: "from",
+    targetKey: "to",
+    sourceLabel: "Trecho dito",
+    targetLabel: "Como escrever",
+    sourcePlaceholder: "zap",
+    targetPlaceholder: "vazio = apaga o trecho",
+    addLabel: "Adicionar substituição",
+    allowEmptyTarget: true,
+    maxRows: 100,
+    onChange: rulesChanged,
+  });
+  const snippetTable = createRuleTable({
+    container: snippetRulesTable,
+    sourceKey: "trigger",
+    targetKey: "expansion",
+    sourceLabel: "Frase falada",
+    targetLabel: "Texto inserido",
+    sourcePlaceholder: "minha assinatura",
+    targetPlaceholder: "Atenciosamente, Thiago",
+    addLabel: "Adicionar snippet",
+    multilineTarget: true,
+    maxRows: 50,
+    onChange: rulesChanged,
+  });
+
+  function rulesChanged() {
+    scheduleSave();
+    schedulePreview();
   }
 
-  function serializeRules(rules, sourceKey, targetKey) {
-    return rules
-      .map(
-        (rule) =>
-          `${rule[sourceKey]} => ${rule[targetKey].replaceAll("\n", "\\n")}`,
-      )
-      .join("\n");
+  // "Testar as regras": the main process applies the rules being edited with
+  // the same service a dictation uses, so the preview matches the real paste.
+  let previewTimer;
+  let previewRequest = 0;
+  function schedulePreview() {
+    window.clearTimeout(previewTimer);
+    previewTimer = window.setTimeout(updatePreview, 150);
+  }
+
+  async function updatePreview() {
+    const text = ruleTestInput.value;
+    const request = ++previewRequest;
+    if (!text.trim()) {
+      ruleTestOutput.hidden = true;
+      return;
+    }
+    try {
+      const result = await window.localFlow.previewPersonalization({
+        text,
+        replacements: replacementTable.get(),
+        snippets: snippetTable.get(),
+      });
+      if (request !== previewRequest) return;
+      const body = document.createElement("p");
+      body.className = "rule-test-text";
+      body.textContent = result.text;
+      const meta = document.createElement("small");
+      meta.textContent =
+        `${result.replacementsApplied} substituição(ões) · ${result.snippetsExpanded} snippet(s)`;
+      ruleTestOutput.replaceChildren(body, meta);
+      ruleTestOutput.hidden = false;
+    } catch {
+      if (request !== previewRequest) return;
+      ruleTestOutput.textContent = "Não foi possível testar agora.";
+      ruleTestOutput.hidden = false;
+    }
   }
 
   function readForm() {
@@ -103,16 +147,8 @@ export function createSettingsController({
       revisionMode: revisionModeSelect.value,
       revisionModel: revisionModelSelect.value,
       writingProfile: writingProfileSelect.value,
-      replacements: parseRules(
-        replacementRulesInput.value,
-        "from",
-        "to",
-      ),
-      snippets: parseRules(
-        snippetRulesInput.value,
-        "trigger",
-        "expansion",
-      ),
+      replacements: replacementTable.get(),
+      snippets: snippetTable.get(),
       autoPaste: autoPasteInput.checked,
       // Ctrl+V being sent does not prove that the target field received text.
       // Keep the transcription available for manual paste in that case.
@@ -182,16 +218,8 @@ export function createSettingsController({
       }),
     );
     writingProfileSelect.value = settings.writingProfile;
-    replacementRulesInput.value = serializeRules(
-      settings.replacements,
-      "from",
-      "to",
-    );
-    snippetRulesInput.value = serializeRules(
-      settings.snippets,
-      "trigger",
-      "expansion",
-    );
+    replacementTable.set(settings.replacements);
+    snippetTable.set(settings.snippets);
     autoPasteInput.checked = settings.autoPaste;
     restoreClipboardInput.checked = false;
     launchAtLoginInput.checked = settings.launchAtLogin;
@@ -297,17 +325,13 @@ export function createSettingsController({
     await saveInFlight;
     const rules = appendReplacementRule(readForm().replacements, from, to);
     const added = rules[rules.length - 1];
-    replacementRulesInput.value = serializeRules(
-      rules,
-      "from",
-      "to",
-    );
+    replacementTable.set(rules);
     const saved = await persist();
     if (!saved?.replacements.some((rule) =>
       rule.from === added.from && rule.to === added.to)) {
       throw new Error("Não foi possível salvar a regra.");
     }
-    replacementRulesInput.value = serializeRules(saved.replacements, "from", "to");
+    replacementTable.set(saved.replacements);
   }
 
   function scheduleSave() {
@@ -316,11 +340,7 @@ export function createSettingsController({
     saveTimer = window.setTimeout(persist, 350);
   }
 
-  const liveInputs = new Set([
-    vocabularyInput,
-    replacementRulesInput,
-    snippetRulesInput,
-  ]);
+  const liveInputs = new Set([vocabularyInput]);
   for (const control of controls) {
     control.addEventListener(
       liveInputs.has(control) ? "input" : "change",
@@ -328,6 +348,7 @@ export function createSettingsController({
     );
   }
   revisionModeSelect.addEventListener("change", syncRevisionControls);
+  ruleTestInput.addEventListener("input", schedulePreview);
   navigator.mediaDevices?.addEventListener(
     "devicechange",
     refreshMicrophones,
@@ -375,6 +396,8 @@ export function createSettingsController({
     setDisabled(disabled) {
       busy = disabled;
       for (const control of controls) control.disabled = disabled;
+      replacementTable.setDisabled(disabled);
+      snippetTable.setDisabled(disabled);
       syncRevisionControls();
       selectPickers.sync();
     },

@@ -407,25 +407,32 @@
                 <small>Orienta os modos limpo e inteligente.</small>
               </label>
             </div>
-            <div class="field-grid two">
-              <label class="field rule-editor">
-                <span>Substituições</span>
-                <textarea
-                  id="replacementRulesInput"
-                  rows="5"
-                  placeholder="zap => WhatsApp&#10;tipo =>"
-                ></textarea>
-                <small>Uma regra por linha: origem => destino.</small>
+            <div class="rule-editor">
+              <div class="rule-editor-head">
+                <h3>Substituições</h3>
+                <p>Troca o que foi dito pelo que deve ser escrito. Destino vazio apaga o trecho.</p>
+              </div>
+              <div class="rule-table" id="replacementRulesTable"></div>
+            </div>
+            <div class="rule-editor">
+              <div class="rule-editor-head">
+                <h3>Snippets</h3>
+                <p>Uma frase curta falada vira um texto pronto, com quebras de linha.</p>
+              </div>
+              <div class="rule-table" id="snippetRulesTable"></div>
+            </div>
+            <div class="rule-test">
+              <label class="field">
+                <span>Testar as regras</span>
+                <input
+                  id="ruleTestInput"
+                  type="text"
+                  maxlength="2000"
+                  placeholder="Digite uma frase como se tivesse ditado"
+                  autocomplete="off"
+                />
               </label>
-              <label class="field rule-editor">
-                <span>Snippets</span>
-                <textarea
-                  id="snippetRulesInput"
-                  rows="5"
-                  placeholder="minha assinatura => Atenciosamente,\nMarcos"
-                ></textarea>
-                <small>Use \n para inserir uma quebra de linha.</small>
-              </label>
+              <div class="rule-test-output" id="ruleTestOutput" aria-live="polite" hidden></div>
             </div>
           </section>
 

@@ -104,6 +104,8 @@ contextBridge.exposeInMainWorld("localFlow", {
   updateSettings: (patch) =>
     ipcRenderer.invoke("settings:update", patch),
   resetSettings: () => ipcRenderer.invoke("settings:reset"),
+  previewPersonalization: (payload) =>
+    ipcRenderer.invoke("personalization:preview", payload),
   showDashboard: () => ipcRenderer.invoke("app:show-dashboard"),
   hideDashboard: () => ipcRenderer.invoke("app:hide-dashboard"),
 });
