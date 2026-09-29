@@ -417,6 +417,18 @@ body {
   background: rgba(22, 22, 26, 0.9);
 }
 
+/* Locked recording (double tap, alternative shortcut, tray, panel button):
+   a small lock before the bars says "tap again to stop". While Ctrl+Win is
+   held (push-to-talk) there is no lock: releasing stops. */
+.lock {
+  display: none;
+  flex: 0 0 auto;
+  color: #ffffffb8;
+}
+.capsule[data-locked="true"] .lock {
+  display: block;
+}
+
 /* Recording hints. "Esc cancela" is quiet; the silent mic and the last
    seconds before the duration limit use amber, dimming or tinting the bars so
    the warning reads even at a glance. */

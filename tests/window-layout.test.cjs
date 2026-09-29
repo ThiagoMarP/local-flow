@@ -54,6 +54,7 @@ test("normaliza estado recebido pelo renderer", () => {
       manualPaste: false,
       hint: null,
       remainingMs: 0,
+      locked: false,
     },
   );
 });
@@ -403,4 +404,10 @@ test("menu da bandeja só é remontado quando o conteúdo muda", () => {
   manager.setRevisionEnabled(false);
   assert.equal(built.length, afterSetup + 4);
   manager.beginQuit();
+});
+
+test("normaliza o cadeado da gravação como booleano estrito", () => {
+  assert.equal(normalizeUiState({ state: "recording", locked: true }).locked, true);
+  assert.equal(normalizeUiState({ state: "recording", locked: "sim" }).locked, false);
+  assert.equal(normalizeUiState({ state: "recording" }).locked, false);
 });

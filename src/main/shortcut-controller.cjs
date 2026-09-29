@@ -15,6 +15,9 @@ class ToggleDictationController {
     this.clock = clock;
     this.state = "idle";
     this.target = null;
+    // How the current recording started: "hold" (push-to-talk, ends on
+    // release) or "locked" (toggle, ends on the next gesture).
+    this.mode = null;
     this.lastToggleAt = -Infinity;
     // A foreground-window lookup can still be pending when Escape cancels the
     // gesture. Its completion must not send a late start command.
@@ -54,11 +57,12 @@ class ToggleDictationController {
   // must not be debounced because the user controls the press/release timing.
   // A caller that already knows where the text goes (the tray, which has taken
   // focus from the user's app) passes `target` and skips the capture.
-  async start({ target: knownTarget } = {}) {
+  async start({ target: knownTarget, mode = "hold" } = {}) {
     this.recoverIfStale();
     if (this.state !== "idle") {
       return { accepted: false, reason: "busy", state: this.state };
     }
+    this.mode = mode;
     this.setState("starting");
     const generation = this.generation;
     try {
@@ -102,9 +106,15 @@ class ToggleDictationController {
     }
     this.lastToggleAt = now;
     this.recoverIfStale();
-    if (this.state === "idle") return this.start(options);
+    if (this.state === "idle") return this.start({ ...options, mode: "locked" });
     if (this.state === "recording") return this.stop();
     return { accepted: false, reason: "busy", state: this.state };
+  }
+
+  // True while a push-to-talk recording is being held; the capsule shows a lock
+  // for every other recording.
+  isHoldGesture() {
+    return this.mode === "hold" && ["starting", "recording"].includes(this.state);
   }
 
   setState(state) {
@@ -130,6 +140,7 @@ class ToggleDictationController {
     this.generation += 1;
     this.state = "idle";
     this.target = null;
+    this.mode = null;
     this.onStateChange(this.state, this.target);
   }
 }

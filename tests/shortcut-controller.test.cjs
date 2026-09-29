@@ -204,3 +204,28 @@ test("toggle com destino informado não captura a janela em foco", async () => {
   assert.equal(events[0], tray);
   assert.equal(controller.target, tray);
 });
+
+// A cápsula mostra um cadeado quando a gravação está travada (tocar 2×, atalho
+// alternativo, bandeja) e nada quando o usuário está segurando o Ctrl+Win.
+test("sabe se a gravação atual é de segurar ou travada", async () => {
+  let now = 1000;
+  const controller = new ToggleDictationController({
+    clock: () => now,
+    captureTarget: async () => ({ hwnd: "42" }),
+    onStart: async () => {},
+    onStop: async () => {},
+  });
+  assert.equal(controller.isHoldGesture(), false);
+  await controller.start();
+  assert.equal(controller.isHoldGesture(), true);
+  await controller.stop();
+  assert.equal(controller.isHoldGesture(), false);
+  controller.complete();
+
+  now += 1000;
+  await controller.toggle();
+  assert.equal(controller.state, "recording");
+  assert.equal(controller.isHoldGesture(), false);
+  controller.fail();
+  assert.equal(controller.isHoldGesture(), false);
+});

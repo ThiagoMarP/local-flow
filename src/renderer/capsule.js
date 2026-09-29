@@ -40,6 +40,7 @@ function render(state) {
   current = state;
   capsule.dataset.state = state.state;
   capsule.dataset.manualPaste = String(Boolean(state.manualPaste));
+  capsule.dataset.locked = String(state.state === "recording" && Boolean(state.locked));
   capsule.dataset.hint = state.state === "recording" && state.hint ? state.hint : "";
   hint.textContent = capsule.dataset.hint ? hintText(state) : "";
   message.textContent = state.message || "Local Flow";

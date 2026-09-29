@@ -27,7 +27,7 @@ function createRenderer(options = {}) {
   let worklet;
   let transcriptions = 0;
   let command;
-  let keydown;
+  const keydownListeners = [];
   let progressHandler;
   let nextRun = 0;
 
@@ -117,7 +117,7 @@ function createRenderer(options = {}) {
       localFlow,
       crypto: { randomUUID: () => `test-run-${++nextRun}` },
       addEventListener(type, listener) {
-        if (type === "keydown") keydown = listener;
+        if (type === "keydown") keydownListeners.push(listener);
       },
       setInterval: () => 1,
       clearInterval() {},
@@ -155,6 +155,9 @@ function createRenderer(options = {}) {
     startMeetingCapture: async () => {},
     stopMeetingCapture: async () => {},
     joinAndEncode: () => new Uint8Array(64),
+    formatTimeSaved: (minutes) => `${Math.round(minutes)} min`,
+    timeSavedMinutes: (words) => words / 40 - words / 150,
+    panelShortcut: () => null,
     recordingHint: (input) => realRecordingHint(input),
   });
 
@@ -181,12 +184,13 @@ function createRenderer(options = {}) {
     get cancelCalls() { return cancelCalls; },
     keydown(key = "Escape") {
       let prevented = false;
-      keydown?.({
+      const event = {
         key,
         repeat: false,
         preventDefault() { prevented = true; },
         stopPropagation() {},
-      });
+      };
+      for (const listener of keydownListeners) listener(event);
       return prevented;
     },
     progress(update) { progressHandler?.(update); },

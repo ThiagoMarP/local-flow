@@ -8,6 +8,8 @@ import {
 } from "./meeting-recorder.js";
 import { createMeetingsController } from "./meetings-controller.js";
 import { recordingHint } from "./recording-hint.js";
+import { formatTimeSaved, timeSavedMinutes } from "./stats.js";
+import { panelShortcut } from "./panel-shortcuts.js";
 
 const recordButton = document.querySelector("#recordButton");
 const stopButton = document.querySelector("#stopButton");
@@ -34,6 +36,7 @@ const historySearch = document.querySelector("#historySearch");
 const statTotal = document.querySelector("#statTotal");
 const statWords = document.querySelector("#statWords");
 const statModel = document.querySelector("#statModel");
+const statTimeSaved = document.querySelector("#statTimeSaved");
 const navItems = [...document.querySelectorAll(".nav-item")];
 const pages = [...document.querySelectorAll(".page")];
 const modelsNavAlert = document.querySelector("#modelsNavAlert");
@@ -1076,6 +1079,7 @@ function renderStats(items) {
         0,
       );
     statWords.textContent = words.toLocaleString("pt-BR");
+    if (statTimeSaved) statTimeSaved.textContent = formatTimeSaved(timeSavedMinutes(words));
   }
   showActiveModel();
 }
@@ -1132,6 +1136,15 @@ window.localFlow.onRevisionEnabledChanged((enabled) => {
 });
 window.localFlow.onRevisionModeChanged((mode) => {
   settingsController.applyRevisionMode(mode);
+});
+// Ctrl+1..5, Ctrl+, and Ctrl+F inside the dashboard.
+window.addEventListener("keydown", (event) => {
+  const currentPage = navItems.find((item) => item.classList.contains("active"))?.dataset.page;
+  const action = panelShortcut(event, currentPage);
+  if (!action) return;
+  event.preventDefault();
+  showPage(action.page);
+  if (action.focus) document.querySelector(action.focus)?.focus();
 });
 window.localFlow.onNavigate((page) => {
   if (navItems.some((item) => item.dataset.page === page)) showPage(page);
