@@ -44,8 +44,8 @@ const signals = [
   [settings, "normalizeSnippets", "snippets persistentes"],
   [pipeline, "applyReplacements", "substituição antes da revisão"],
   [pipeline, "expandSnippets", "snippet depois da revisão"],
-  [renderer, "replacementRulesInput", "editor de substituições"],
-  [renderer, "snippetRulesInput", "editor de snippets"],
+  [renderer, "replacementRulesTable", "editor de substituições"],
+  [renderer, "snippetRulesTable", "editor de snippets"],
 ];
 for (const [source, signal, label] of signals) {
   const present = source.includes(signal);

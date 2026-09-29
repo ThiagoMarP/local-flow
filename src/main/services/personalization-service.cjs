@@ -153,7 +153,9 @@ class PersonalizationService {
     );
     result.text = result.text
       .replace(/[ \t]{2,}/g, " ")
-      .replace(/[ \t]+([,.;!?])/g, "$1");
+      .replace(/[ \t]+([,.;!?])/g, "$1")
+      // A rule that removes the first or last word must not leave a space.
+      .replace(/^[ \t]+|[ \t]+$/g, "");
     return result;
   }
 
@@ -166,7 +168,19 @@ class PersonalizationService {
     );
   }
 
-  writingInstruction(profile) {
+  // What a dictation would paste for `text`, minus the AI revision: the
+  // Settings test field shows this while the rules are being edited.
+  preview({ text, replacements, snippets } = {}) {
+    const replaced = this.applyReplacements(String(text || "").slice(0, 2000), replacements);
+    const expanded = this.expandSnippets(replaced.text, snippets);
+    return {
+      text: expanded.text,
+      replacementsApplied: replaced.applied,
+      snippetsExpanded: expanded.applied,
+    };
+  }
+
+    writingInstruction(profile) {
     return (
       WRITING_PROFILES.get(profile) ||
       WRITING_PROFILES.get("neutral")

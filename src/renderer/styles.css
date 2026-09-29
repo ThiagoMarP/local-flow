@@ -1324,13 +1324,130 @@ textarea:focus {
   font-size: 14px;
 }
 
-.rule-editor textarea {
-  min-height: 116px;
-  margin-top: 0;
-  font:
-    12.5px/1.55 "Cascadia Mono",
-    Consolas,
-    monospace;
+/* Substituições and Snippets: one row per rule, source → target. */
+.rule-editor {
+  margin-top: 18px;
+}
+
+.rule-editor-head {
+  margin-bottom: 10px;
+}
+
+.rule-editor-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.rule-editor-head p {
+  margin: 3px 0 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.rule-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.rule-rows:not(:empty) {
+  margin-bottom: 10px;
+}
+
+.rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) auto minmax(0, 3fr) 30px;
+  gap: 4px 8px;
+  align-items: start;
+}
+
+.rule-row input,
+.rule-row textarea {
+  height: 36px;
+  min-height: 36px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.rule-row textarea {
+  height: auto;
+  max-height: 160px;
+  resize: none;
+  line-height: 1.4;
+  field-sizing: content;
+}
+
+.rule-arrow {
+  align-self: center;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.rule-remove {
+  width: 30px;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.rule-remove:hover:not(:disabled) {
+  background: #e5484d1a;
+  color: var(--danger-text);
+}
+
+.rule-issue {
+  grid-column: 1 / -1;
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.rule-issue:empty {
+  display: none;
+}
+
+.rule-row.has-issue .rule-source {
+  border-color: #f6b94a66;
+}
+
+.rule-add {
+  justify-self: start;
+}
+
+.rule-test {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.rule-test-output {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent-soft);
+  border-radius: 10px;
+  background: #6fe0a90d;
+}
+
+.rule-test-text {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.rule-test-output small {
+  color: var(--text-3);
+  font-size: 12px;
 }
 
 /* One list with dividers instead of a card per toggle. */
