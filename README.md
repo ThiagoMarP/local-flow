@@ -33,7 +33,7 @@ transcrição; nas reuniões, a gravação fica no histórico local até você a
 
 ## Download
 
-Baixe o instalador `Local Flow Setup X.Y.Z.exe` na página de
+Baixe o instalador `Local.Flow.Setup.X.Y.Z.exe` na página de
 [Releases](https://github.com/ThiagoMarP/local-flow/releases/latest) e execute.
 
 > **Aviso do Windows:** o instalador ainda não tem assinatura digital. O

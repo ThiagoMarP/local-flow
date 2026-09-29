@@ -2,7 +2,7 @@
 
 ## 1. Instalar
 
-1. Baixe o arquivo `Local Flow Setup x.y.z.exe`.
+1. Baixe o arquivo `Local.Flow.Setup.x.y.z.exe`.
 2. Execute o instalador. Ele é **por usuário** e não exige privilégios de
    administrador.
 3. Escolha a pasta de instalação (opcional) e conclua. Serão criados atalhos no
