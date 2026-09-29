@@ -130,7 +130,7 @@ function syncMeetingModelAvailability() {
   if (!meetingProfileAvailable && ["idle", "error", "setup-required"].includes(meetingPhase)) {
     setMeetingStatus(
       "setup-required",
-      "Instale o modelo Whisper de reuniões em Modelos.",
+      "Instale em Modelos o modelo escolhido para reuniões.",
     );
   } else if (meetingProfileAvailable && meetingPhase === "setup-required") {
     setMeetingStatus("idle", "Pronto para gravar.");

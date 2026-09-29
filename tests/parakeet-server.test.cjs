@@ -179,3 +179,24 @@ test("encerrar o app mata o processo do servidor", async () => {
   assert.equal(runtime.spawns[0].child.killed, true);
   assert.equal(server.available, false);
 });
+
+// Reuniões precisam do horário de cada palavra para intercalar as falas.
+test("com palavras, pede verbose_json e devolve texto e palavras", async () => {
+  const words = [{ word: "Oi.", start: 0.2, end: 0.6 }];
+  const runtime = fakeRuntime({
+    respond: () => ({ ok: true, json: async () => ({ text: "Oi.", words }) }),
+  });
+  const server = createServer(runtime);
+  const result = await server.transcribe(request({ withWords: true }));
+  assert.deepEqual(result, { text: "Oi.", words });
+  assert.equal(runtime.requests[0].init.body.get("response_format"), "verbose_json");
+  server.dispose();
+});
+
+test("sem palavras, continua pedindo json e devolvendo só o texto", async () => {
+  const runtime = fakeRuntime();
+  const server = createServer(runtime);
+  assert.equal(await server.transcribe(request()), "Olá.");
+  assert.equal(runtime.requests[0].init.body.get("response_format"), "json");
+  server.dispose();
+});

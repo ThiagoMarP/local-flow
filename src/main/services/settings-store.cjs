@@ -19,7 +19,9 @@ const {
 
 const SETTINGS_VERSION = 8;
 const ALLOWED_PROFILES = new Set(["fast", "standard", "accurate", "parakeet"]);
-const ALLOWED_MEETING_PROFILES = new Set(["fast", "standard", "accurate"]);
+// Parakeet reports per-word timestamps (verbose_json / --json), which meetings
+// need to interleave the two speakers, so it is valid here too.
+const ALLOWED_MEETING_PROFILES = new Set(["fast", "standard", "accurate", "parakeet"]);
 const ALLOWED_MEETING_CAPTURE_MODES = new Map([
   ["both", "Meu microfone + áudio do sistema"],
   ["mic", "Só o meu microfone"],

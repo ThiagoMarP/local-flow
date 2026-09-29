@@ -27,8 +27,10 @@ No primeiro uso:
 3. Aguarde a barra de progresso concluir. O perfil fica disponível
    imediatamente. Selecione-o em **Configurações → Perfil do modelo**.
 
-O Parakeet é usado no ditado. A transcrição de reuniões permanece nos perfis
-Whisper, que fornecem os segmentos necessários para separar as falas.
+O Parakeet serve para o ditado e para reuniões. Nas reuniões o app pede ao
+Parakeet o horário de cada palavra, que é o que permite intercalar as falas do
+seu microfone com as do áudio do sistema. Escolha o modelo das reuniões em
+**Configurações → Reuniões → Qualidade da transcrição**.
 
 Os modelos são baixados de `huggingface.co` e salvos em
 `%APPDATA%\Local Flow\models`. Você pode baixar mais de um perfil e alternar

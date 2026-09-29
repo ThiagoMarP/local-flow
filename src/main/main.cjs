@@ -49,7 +49,6 @@ const { ToggleDictationController } = require("./shortcut-controller.cjs");
 const { EscapeShortcut } = require("./escape-shortcut.cjs");
 const { createHotkeyTrigger } = require("./hotkey-listener.cjs");
 const { WindowsBridge } = require("./windows-bridge.cjs");
-const { transcribeWav } = require("./whisper-service.cjs");
 
 const projectRoot = path.resolve(__dirname, "..", "..");
 const startupStartedAt = Date.now();
@@ -373,8 +372,10 @@ app.whenReady().then(async () => {
     transcribeWav: transcribeDictation,
     revisionService,
   });
+  // Meetings go through the same router as dictation, so the Parakeet profile
+  // uses the warm server (with per-word timestamps) and Whisper the CLI.
   const meetingService = new MeetingService({
-    transcribeWav,
+    transcribeWav: transcribeDictation,
     projectRoot,
     whisperCli: appPaths.whisperCli,
     modelsDir: appPaths.modelsDir,

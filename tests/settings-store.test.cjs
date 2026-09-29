@@ -57,10 +57,13 @@ test("persiste atualização parcial", async () => {
   assert.equal(next.get().writingProfile, "neutral");
 });
 
-test("aceita Parakeet no ditado e mantém reuniões nos modelos Whisper", () => {
+// O Parakeet agora devolve horário por palavra, que a reunião precisa para
+// intercalar as falas; por isso passou a valer também nas reuniões.
+test("aceita Parakeet no ditado e nas reuniões", () => {
   const settings = normalizeSettings({ profile: "parakeet", meetingProfile: "parakeet" });
   assert.equal(settings.profile, "parakeet");
-  assert.equal(settings.meetingProfile, "fast");
+  assert.equal(settings.meetingProfile, "parakeet");
+  assert.equal(normalizeSettings({ meetingProfile: "outro" }).meetingProfile, "fast");
 });
 
 test("aceita o modo experimental sem alterar o padrão literal", () => {
