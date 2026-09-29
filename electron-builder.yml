@@ -30,6 +30,11 @@ extraResources:
     filter:
       - bin/**/*
       - share/**/*
+  - from: .
+    to: licenses
+    filter:
+      - LICENSE
+      - THIRD_PARTY_NOTICES.md
   - from: native/windows
     to: native/windows
     filter:
