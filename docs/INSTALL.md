@@ -23,7 +23,7 @@ No primeiro uso:
    - **Small · rápido** (~190 MB): menor latência.
    - **Medium · padrão** (~514 MB): equilíbrio recomendado.
    - **Large V3 Turbo · precisão** (~547 MB): maior qualidade.
-   - **Parakeet TDT 0.6B v3** (~681 MB): alternativa para ditado em português.
+   - **Parakeet v3 · veloz e preciso** (~681 MB, Parakeet TDT 0.6B v3): alternativa para ditado em português.
 3. Aguarde a barra de progresso concluir. O perfil fica disponível
    imediatamente. Selecione-o em **Configurações → Perfil do modelo**.
 

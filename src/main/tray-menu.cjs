@@ -2,7 +2,7 @@ const PROFILE_LABELS = {
   fast: "Rápido · Small",
   standard: "Padrão · Medium",
   accurate: "Precisão · Large V3 Turbo",
-  parakeet: "Parakeet TDT 0.6B v3",
+  parakeet: "Veloz e preciso · Parakeet v3",
 };
 
 // The dictation entry follows what the capsule shows right now.
