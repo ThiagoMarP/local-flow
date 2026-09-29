@@ -36,17 +36,6 @@ class TestHarness {
         );
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
-      // "selector=text": types into one field before the capture (e.g. the
-      // Settings rule tester) so its live result shows on screen.
-      if (process.env.LOCAL_FLOW_CAPTURE_TYPE) {
-        const [selector, ...rest] = process.env.LOCAL_FLOW_CAPTURE_TYPE.split("=");
-        await window.webContents.executeJavaScript(
-          `(() => { const field = document.querySelector(${JSON.stringify(selector)});` +
-            ` if (!field) return; field.value = ${JSON.stringify(rest.join("="))};` +
-            ` field.dispatchEvent(new Event("input", { bubbles: true })); })()`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, 700));
-      }
       if (process.env.LOCAL_FLOW_SETTINGS_PREVIEW === "1") {
         await window.webContents.executeJavaScript(
           "new Promise((resolve) => { const tick = () => { if (document.querySelector('#revisionModeTrigger')) resolve(); else setTimeout(tick, 50); }; tick(); }).then(() => { document.querySelector('[data-page=\"settings\"].nav-item')?.click(); document.querySelector('#revisionModeTrigger')?.scrollIntoView({block:'center'}); })",
@@ -74,6 +63,17 @@ class TestHarness {
           "document.querySelector('.personalization-panel')?.scrollIntoView({block:'start'})",
         );
         await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      // "selector=text": types into one field before the capture (e.g. the
+      // Settings rule tester) so its live result shows on screen.
+      if (process.env.LOCAL_FLOW_CAPTURE_TYPE) {
+        const [selector, ...rest] = process.env.LOCAL_FLOW_CAPTURE_TYPE.split("=");
+        await window.webContents.executeJavaScript(
+          `(() => { const field = document.querySelector(${JSON.stringify(selector)});` +
+            ` if (!field) return; field.value = ${JSON.stringify(rest.join("="))};` +
+            ` field.dispatchEvent(new Event("input", { bubbles: true })); })()`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 700));
       }
       const image = await window.webContents.capturePage();
       await writeFile(target, image.toPNG());
