@@ -2,6 +2,21 @@ const os = require("node:os");
 const path = require("node:path");
 const { writeFile } = require("node:fs/promises");
 
+// What to tell the user when the summary could not be generated, by the
+// reason meeting-summary-service reports.
+function summaryFailureMessage(reason) {
+  if (reason === "ollama-unavailable") {
+    return "O Ollama está fechado. Abra o Ollama e tente de novo.";
+  }
+  if (reason === "timeout") {
+    return "O modelo demorou demais para resumir. Tente de novo ou escolha um modelo menor em Configurações → Reuniões.";
+  }
+  if (/^ollama-http-/.test(String(reason))) {
+    return "O Ollama recusou o pedido. Confira se o modelo do resumo está instalado.";
+  }
+  return "Não foi possível gerar o resumo. Tente de novo.";
+}
+
 // Meeting capture: the start/stop toggle, the chunk writes coming from the
 // renderer (which owns microphone + system audio) and the background queue
 // that transcribes and summarizes each finished meeting, one at a time, so the
@@ -41,6 +56,37 @@ class MeetingController {
     this.chunkQueue = Promise.resolve();
     this.lastToggleAt = 0;
     this.queue = Promise.resolve();
+    this.summarizing = new Set();
+  }
+
+  // "Gerar resumo" / "Refazer resumo" on a meeting card: summarize the saved
+  // transcript with the current summary model.
+  async regenerateSummary(id) {
+    if (this.summarizing.has(id)) {
+      throw new Error("O resumo desta reunião já está sendo gerado.");
+    }
+    this.summarizing.add(id);
+    try {
+      const meeting = await this.meetingStore.get(id);
+      if (meeting.state === "recording" || meeting.state === "processing") {
+        throw new Error("Aguarde a reunião terminar de ser processada.");
+      }
+      if (!meeting.hasTranscript || !meeting.transcript?.trim()) {
+        throw new Error("Esta reunião não tem transcrição para resumir.");
+      }
+      const summary = await this.meetingSummaryService.summarize(meeting.transcript, {
+        model: this.settingsStore.get().meetingSummaryModel,
+      });
+      if (!summary.applied) {
+        await this.logger.warn("meeting_summary_regenerate_failed", { reason: summary.reason });
+        throw new Error(summaryFailureMessage(summary.reason));
+      }
+      const saved = await this.meetingStore.saveSummary(id, summary.markdown);
+      await this.logger.info("meeting_summary_regenerated", { elapsedMs: summary.elapsedMs });
+      return saved;
+    } finally {
+      this.summarizing.delete(id);
+    }
   }
 
   // Dictation and meeting recording both need the microphone.
@@ -104,6 +150,7 @@ class MeetingController {
   // completion pulse. Runs off the IPC response so the renderer can record again
   // immediately.
   async process({ id, dir, chunkCount, micSeconds, systemSeconds, interrupted }) {
+    const profile = this.settingsStore.get().meetingProfile;
     let transcript = null;
     let turns = 0;
     let partial = false;
@@ -112,7 +159,7 @@ class MeetingController {
       const meeting = await this.meetingService.runFromChunkFiles({
         dir,
         chunkCount,
-        profile: this.settingsStore.get().meetingProfile,
+        profile,
         threads: os.cpus().length,
         vocabulary: this.settingsStore.get().vocabulary,
       });
@@ -121,6 +168,8 @@ class MeetingController {
       partial = Boolean(meeting.partial);
       failures = meeting.failures || [];
       await writeFile(path.join(dir, "transcript.txt"), transcript, "utf8");
+      // Turns with speaker and timestamps, so the card can show who spoke when.
+      await writeFile(path.join(dir, "turns.json"), JSON.stringify(meeting.turns), "utf8");
       console.log(
         `LOCAL_FLOW_MEETING_TRANSCRIBED=${JSON.stringify({
           dir,
@@ -178,6 +227,7 @@ class MeetingController {
       failures,
       turns,
       summarized,
+      profile,
     });
     await this.logger.info("meeting_capture_saved", {
       dir,
@@ -328,8 +378,11 @@ class MeetingController {
     ipcMain.handle("meetings:list", () => this.meetingStore.list());
     ipcMain.handle("meetings:get", (_event, id) => this.meetingStore.get(id));
     ipcMain.handle("meetings:remove", (_event, id) => this.meetingStore.remove(id));
+    ipcMain.handle("meetings:regenerate-summary", (_event, id) =>
+      this.regenerateSummary(String(id)),
+    );
     ipcMain.on("meeting:event", (_event, payload) => this.onRendererEvent(payload));
   }
 }
 
-module.exports = { MeetingController };
+module.exports = { MeetingController, summaryFailureMessage };
