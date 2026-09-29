@@ -117,3 +117,46 @@ test("remove preserva reuniões ainda gravando ou processando", async () => {
     await rm(base, { recursive: true, force: true });
   }
 });
+
+// Resumo gerado depois (Ollama estava fechado no processamento): grava o
+// resumo e marca a reunião como resumida, sem mexer no resto do meta.
+test("saveSummary grava o resumo e marca a reunião como resumida", async () => {
+  const base = await tempBase();
+  try {
+    const id = "2026-06-30T10-00-00-000Z";
+    await mkdir(path.join(base, id));
+    await writeFile(path.join(base, id, "meta.json"),
+      JSON.stringify({ at: 1000, turns: 3, summarized: false, state: "done" }));
+    await writeFile(path.join(base, id, "transcript.txt"), "[Você] oi");
+    const store = new MeetingStore({ baseDir: base });
+    const saved = await store.saveSummary(id, "## Resumo\n\nok");
+    assert.strictEqual(saved.hasSummary, true);
+    assert.strictEqual(saved.summarized, true);
+    assert.strictEqual(saved.turns, 3);
+    assert.strictEqual(saved.summary, "## Resumo\n\nok");
+    // Só grava numa reunião que existe (e o id nunca sai da pasta de reuniões).
+    await assert.rejects(store.saveSummary("../x", "a"), /não encontrada/);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+// As falas com horário ficam em turns.json; reuniões antigas não têm o arquivo.
+test("get traz as falas com horário quando existem", async () => {
+  const base = await tempBase();
+  try {
+    const withTurns = "2026-06-30T10-00-00-000Z";
+    const legacy = "2026-06-30T11-00-00-000Z";
+    await mkdir(path.join(base, withTurns));
+    await mkdir(path.join(base, legacy));
+    const turns = [{ speaker: "mic", label: "Você", text: "oi", from: 0, to: 900 }];
+    await writeFile(path.join(base, withTurns, "turns.json"), JSON.stringify(turns));
+    await writeFile(path.join(base, withTurns, "transcript.txt"), "[Você] oi");
+    await writeFile(path.join(base, legacy, "transcript.txt"), "[Você] oi");
+    const store = new MeetingStore({ baseDir: base });
+    assert.deepStrictEqual((await store.get(withTurns)).transcriptTurns, turns);
+    assert.strictEqual((await store.get(legacy)).transcriptTurns, null);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});

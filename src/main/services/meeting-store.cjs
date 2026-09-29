@@ -3,7 +3,7 @@
 // resumo.md and meta.json. This store lists and reads them for the "Reuniões"
 // page — no separate index file; the folders on disk are the source of truth.
 
-const { readdir, readFile, rm, stat } = require("node:fs/promises");
+const { readdir, readFile, rm, stat, writeFile } = require("node:fs/promises");
 const path = require("node:path");
 
 // Folder names come from new Date().toISOString().replace(/[:.]/g, "-"), e.g.
@@ -71,6 +71,7 @@ class MeetingStore {
       interrupted: Boolean(meta.interrupted),
       error: typeof meta.error === "string" ? meta.error : null,
       failureCount: Array.isArray(meta.failures) ? meta.failures.length : 0,
+      profile: typeof meta.profile === "string" ? meta.profile : null,
       hasTranscript,
       hasSummary: Boolean(summaryText),
       summary: summaryText,
@@ -95,11 +96,44 @@ class MeetingStore {
     const safe = this.safeId(id);
     const dir = path.join(this.baseDir, safe);
     const base = await this.summary(safe);
-    const [transcript, summary] = await Promise.all([
+    const [transcript, summary, turnsJson] = await Promise.all([
       readFile(path.join(dir, "transcript.txt"), "utf8").catch(() => ""),
       readFile(path.join(dir, "resumo.md"), "utf8").catch(() => ""),
+      readFile(path.join(dir, "turns.json"), "utf8").catch(() => ""),
     ]);
-    return { ...base, transcript, summary };
+    // Speech turns with timestamps (turns.json). Meetings saved before it
+    // existed have only the labeled transcript text: null.
+    let transcriptTurns = null;
+    try {
+      const parsed = JSON.parse(turnsJson);
+      if (Array.isArray(parsed)) transcriptTurns = parsed;
+    } catch {
+      transcriptTurns = null;
+    }
+    return { ...base, transcript, summary, transcriptTurns };
+  }
+
+  // A summary generated later (Ollama was closed when the meeting was
+  // processed): write resumo.md and mark the meeting as summarized.
+  async saveSummary(id, markdown) {
+    const safe = this.safeId(id);
+    const dir = path.join(this.baseDir, safe);
+    if (!(await exists(path.join(dir, "transcript.txt")))) {
+      throw new Error("Reunião não encontrada.");
+    }
+    await writeFile(path.join(dir, "resumo.md"), markdown, "utf8");
+    let meta = {};
+    try {
+      meta = JSON.parse(await readFile(path.join(dir, "meta.json"), "utf8"));
+    } catch {
+      meta = {};
+    }
+    await writeFile(
+      path.join(dir, "meta.json"),
+      JSON.stringify({ ...meta, summarized: true }, null, 2),
+      "utf8",
+    );
+    return this.summary(safe);
   }
 
   async remove(id) {

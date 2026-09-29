@@ -1141,6 +1141,21 @@ meetingShortcutSelect.addEventListener("change", () => {
   meetingShortcutHint.textContent = selectedShortcutLabel(meetingShortcutSelect);
 });
 meetingProfileSelect.addEventListener("change", syncMeetingModelAvailability);
+// Reuniões page: which models the next meeting will use, so a Small left on
+// by accident is visible before recording.
+function showMeetingModels() {
+  const hint = document.querySelector("#meetingModelHint");
+  if (!hint) return;
+  const transcription = selectedShortcutLabel(meetingProfileSelect);
+  const summaryModel = meetingSummaryModelSelect.value || "—";
+  hint.textContent = `Transcrição: ${transcription} · Resumo: ${summaryModel}`;
+}
+meetingProfileSelect.addEventListener("change", showMeetingModels);
+meetingSummaryModelSelect.addEventListener("change", showMeetingModels);
+document.querySelector("#meetingSettingsLink")?.addEventListener("click", () => {
+  showPage("settings");
+  document.getElementById("settingsMeetings")?.scrollIntoView({ block: "start" });
+});
 
 let historyClearArmed = false;
 historyClearButton.addEventListener("click", async () => {
@@ -1371,6 +1386,7 @@ async function initialize() {
     showActiveModel();
     meetingShortcutHint.textContent = selectedShortcutLabel(meetingShortcutSelect);
     syncMeetingModelAvailability();
+    showMeetingModels();
     const hotkey = runtime.hotkey || {};
     nativeHotkeyEnabled = Boolean(hotkey.enabled);
     if (hotkey.enabled) {

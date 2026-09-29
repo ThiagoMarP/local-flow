@@ -3,7 +3,25 @@
 // light list up front, content built as DOM (no innerHTML) to stay within the
 // renderer's CSP and avoid injecting model output as markup.
 
+import { formatOffset, transcriptTurns } from "./meeting-transcript.js";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+const PROFILE_LABELS = {
+  fast: "Small",
+  standard: "Medium",
+  accurate: "Large V3 Turbo",
+  parakeet: "Parakeet v3",
+};
+
+// Electron wraps handler rejections as "Error invoking remote method '…':
+// Error: <message>"; keep only the message the main process wrote.
+function ipcErrorMessage(error) {
+  return String(error?.message || error)
+    .replace(/^Error invoking remote method '[^']*':\s*/i, "")
+    .replace(/^(Uncaught )?Error:\s*/i, "");
+}
+
 
 function svgIcon(paths) {
   const svg = document.createElementNS(SVG_NS, "svg");
@@ -127,6 +145,70 @@ export function createMeetingsController({ listEl, countEl, searchEl }) {
     }, 1400);
   }
 
+  // "Gerar resumo" / "Refazer resumo": only for a finished meeting with a
+  // transcript. The summary comes from the main process (Ollama).
+  function canSummarize(meeting) {
+    return meeting.hasTranscript && ["done", "partial"].includes(meeting.state);
+  }
+
+  async function generateSummary(meeting, button, idleLabel) {
+    const card = button.closest(".meeting-card");
+    card?.querySelector(".meeting-summary-error")?.remove();
+    button.disabled = true;
+    button.textContent = "Gerando resumo…";
+    try {
+      const updated = await window.localFlow.regenerateMeetingSummary(meeting.id);
+      all = all.map((item) => (item.id === meeting.id ? { ...item, ...updated } : item));
+      applyFilter();
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = idleLabel;
+      const message = document.createElement("p");
+      message.className = "meeting-summary-error";
+      message.setAttribute("role", "alert");
+      message.textContent = ipcErrorMessage(error);
+      card?.querySelector(".meeting-summary")?.append(message);
+    }
+  }
+
+  // Who spoke and when, one row per turn.
+  function renderTurns(turns) {
+    const list = document.createElement("ol");
+    list.className = "meeting-turns";
+    if (!turns.length) {
+      const empty = document.createElement("li");
+      empty.className = "meeting-turn";
+      empty.textContent = "(transcrição vazia)";
+      list.append(empty);
+      return list;
+    }
+    for (const turn of turns) {
+      const item = document.createElement("li");
+      item.className = "meeting-turn";
+      item.dataset.speaker = turn.speaker;
+      const meta = document.createElement("div");
+      meta.className = "meeting-turn-meta";
+      if (turn.label) {
+        const label = document.createElement("span");
+        label.className = "meeting-turn-label";
+        label.textContent = turn.label;
+        meta.append(label);
+      }
+      const offset = formatOffset(turn.from);
+      if (offset) {
+        const time = document.createElement("time");
+        time.textContent = offset;
+        meta.append(time);
+      }
+      const text = document.createElement("p");
+      text.className = "meeting-turn-text";
+      text.textContent = turn.text;
+      item.append(meta, text);
+      list.append(item);
+    }
+    return list;
+  }
+
   function buildCard(meeting) {
     const card = document.createElement("article");
     card.className = "meeting-card";
@@ -158,6 +240,7 @@ export function createMeetingsController({ listEl, countEl, searchEl }) {
                 ? "sem resumo"
                 : "sem transcrição",
     );
+    if (PROFILE_LABELS[meeting.profile]) bits.push(PROFILE_LABELS[meeting.profile]);
     if (meeting.failureCount > 0) {
       bits.push(meeting.failureCount > 1
         ? `${meeting.failureCount} trechos indisponíveis`
@@ -181,6 +264,15 @@ export function createMeetingsController({ listEl, countEl, searchEl }) {
         flash(copySummary, "Copiado!");
       });
       actions.append(copySummary);
+      if (canSummarize(meeting)) {
+        const redo = document.createElement("button");
+        redo.type = "button";
+        redo.className = "button ghost tiny";
+        redo.textContent = "Refazer resumo";
+        redo.title = "Gerar o resumo de novo com o modelo atual";
+        redo.addEventListener("click", () => generateSummary(meeting, redo, "Refazer resumo"));
+        actions.append(redo);
+      }
     }
     const remove = document.createElement("button");
     remove.type = "button";
@@ -239,11 +331,19 @@ export function createMeetingsController({ listEl, countEl, searchEl }) {
         : meeting.state === "processing"
           ? "Processando transcrição e resumo…"
           : meeting.hasTranscript
-            ? "Resumo indisponível. A transcrição está disponível abaixo."
+            ? "Sem resumo. Se o Ollama estava fechado quando a reunião foi processada, gere agora."
             : meeting.interrupted
               ? "A gravação foi interrompida. O áudio foi preservado no disco."
               : "Transcrição indisponível. O áudio da reunião foi salvo no disco.";
       summary.append(note);
+      if (canSummarize(meeting)) {
+        const generate = document.createElement("button");
+        generate.type = "button";
+        generate.className = "button primary tiny meeting-generate";
+        generate.textContent = "Gerar resumo";
+        generate.addEventListener("click", () => generateSummary(meeting, generate, "Gerar resumo"));
+        summary.append(generate);
+      }
     }
     card.append(summary);
 
@@ -251,16 +351,16 @@ export function createMeetingsController({ listEl, countEl, searchEl }) {
       const details = document.createElement("details");
       details.className = "meeting-transcript";
       const toggle = document.createElement("summary");
-      toggle.textContent = "Ver transcrição completa";
+      toggle.textContent = Number.isFinite(meeting.turns) && meeting.turns > 0
+        ? `Ver transcrição (${meeting.turns} fala${meeting.turns > 1 ? "s" : ""})`
+        : "Ver transcrição";
       details.append(toggle);
       let loaded = false;
       details.addEventListener("toggle", async () => {
         if (!details.open || loaded) return;
         loaded = true;
         const full = await window.localFlow.getMeeting(meeting.id);
-        const text = document.createElement("div");
-        text.className = "meeting-transcript-text";
-        text.textContent = full.transcript || "(transcrição vazia)";
+        const text = renderTurns(transcriptTurns(full));
         const copyTranscript = document.createElement("button");
         copyTranscript.type = "button";
         copyTranscript.className = "button secondary tiny";
