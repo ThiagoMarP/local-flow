@@ -3,7 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const requiredFiles = [
-  "PHASE_7.md",
+  "docs/historico/PHASE_7.md",
   "src/main/services/personalization-service.cjs",
   "tests/personalization-service.test.cjs",
   "scripts/electron-personalization-test.mjs",

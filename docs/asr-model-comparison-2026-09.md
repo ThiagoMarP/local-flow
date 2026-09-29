@@ -5,7 +5,7 @@ Local Flow com as dez amostras do projeto.
 
 ## Ponto de partida do Local Flow
 
-O perfil rápido atual é `whisper.cpp` 1.9.1 com `ggml-small-q5_1.bin` (190.085.487 bytes, cerca de 190 MB), executado em CPU com 12 threads no AMD Ryzen AI 9 HX 370. O benchmark local de 10 amostras marcou WER bruto de 38,9% e 2,03 s por amostra. O próprio relatório alerta que esse WER conta diferenças de formatação e não é diretamente comparável aos benchmarks públicos normalizados ([PHASE_1.md](../PHASE_1.md), [environment.json](../benchmarks/environment.json)).
+O perfil rápido atual é `whisper.cpp` 1.9.1 com `ggml-small-q5_1.bin` (190.085.487 bytes, cerca de 190 MB), executado em CPU com 12 threads no AMD Ryzen AI 9 HX 370. O benchmark local de 10 amostras marcou WER bruto de 38,9% e 2,03 s por amostra. O próprio relatório alerta que esse WER conta diferenças de formatação e não é diretamente comparável aos benchmarks públicos normalizados ([PHASE_1.md](historico/PHASE_1.md), [environment.json](../benchmarks/environment.json)).
 
 ## Números públicos em português
 
@@ -28,7 +28,7 @@ No teste local com os mesmos dez arquivos WAV e a mesma função de WER bruto,
 o Parakeet v3 Q8 obteve **19,6% e 1,23 s por amostra**, contra **38,9% e
 2,03 s** do Whisper Small Q5 registrado na fase 1. O Whisper usou 12 threads;
 o runtime Parakeet usou o paralelismo padrão do executável. As transcrições e
-tempos por amostra estão em [parakeet-v3-q8-report.json](../outputs/parakeet-v3-q8-report.json)
+tempos por amostra estão em [parakeet-v3-q8-report.json](historico/outputs/parakeet-v3-q8-report.json)
 e podem ser reproduzidos com `node scripts/benchmark-parakeet.mjs`. O WER
 penaliza grafias numéricas diferentes mesmo quando o significado está certo;
 "Ollama" também saiu como "OLAM" em uma amostra técnica. Consumo de RAM e
@@ -55,7 +55,7 @@ português é inglês e transcreve a frase inteira em inglês. O Parakeet v3 nã
 aceita idioma fixo; o Nemotron aceita `pt-BR`.
 
 Nos dez áudios, com servidor quente (resultado bruto em
-[asr-nemotron-vs-parakeet-2026-09-28.json](../outputs/asr-nemotron-vs-parakeet-2026-09-28.json)):
+[asr-nemotron-vs-parakeet-2026-09-28.json](historico/outputs/asr-nemotron-vs-parakeet-2026-09-28.json)):
 
 | | Parakeet v3 | Nemotron `pt-BR` | Nemotron automático |
 |---|---|---|---|

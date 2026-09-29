@@ -8,7 +8,7 @@ const requiredFiles = [
   "src/renderer/capsule.html",
   "src/renderer/capsule.css",
   "src/renderer/capsule.js",
-  "PHASE_3.md",
+  "docs/historico/PHASE_3.md",
 ];
 
 let valid = true;

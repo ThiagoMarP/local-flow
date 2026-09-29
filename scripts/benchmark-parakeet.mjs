@@ -8,7 +8,7 @@ const { transcribeParakeetWav } = require(
 );
 const root = process.cwd();
 const samplesDir = path.join(root, "benchmarks", "samples");
-const resultsDir = path.join(root, "outputs");
+const resultsDir = path.join(root, "docs", "historico", "outputs");
 const prompts = JSON.parse(
   await readFile(path.join(root, "benchmarks", "prompts.json"), "utf8"),
 );

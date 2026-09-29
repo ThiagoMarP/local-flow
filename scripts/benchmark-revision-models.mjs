@@ -141,6 +141,6 @@ const summary = models.map((model) => {
   };
 });
 const report = { measuredAt: new Date().toISOString(), cases: results, summary };
-const target = path.join(process.cwd(), "outputs", "revision-model-comparison-2026-09.json");
+const target = path.join(process.cwd(), "docs", "historico", "outputs", "revision-model-comparison-2026-09.json");
 await writeFile(target, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 console.log(JSON.stringify({ summary, report: target }, null, 2));

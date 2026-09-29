@@ -3,7 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const requiredFiles = [
-  "PHASE_8.md",
+  "docs/historico/PHASE_8.md",
   "electron-builder.yml",
   "README.md",
   "docs/INSTALL.md",

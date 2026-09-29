@@ -6,7 +6,7 @@ const requiredFiles = [
   "native/windows/foreground-helper.ps1",
   "src/main/windows-bridge.cjs",
   "src/main/shortcut-controller.cjs",
-  "PHASE_4.md",
+  "docs/historico/PHASE_4.md",
 ];
 
 let valid = true;
