@@ -102,7 +102,7 @@ test("linhas informativas usam os atalhos reais", () => {
   }).value);
   assert.ok(byLabel(template, "Ditado: Ctrl + Alt (2× ou segurar)"));
   assert.ok(byLabel(template, "Colar última: Ctrl+Alt+B"));
-  assert.ok(byLabel(template, "Modelo: Parakeet TDT 0.6B v3"));
+  assert.ok(byLabel(template, "Modelo: Veloz e preciso · Parakeet v3"));
 
   const off = buildTrayTemplate(input({
     hotkey: { ready: false, display: "Ctrl + Win" },

@@ -31,7 +31,7 @@ const MODEL_CATALOG = Object.freeze({
   },
   parakeet: {
     profile: "parakeet",
-    name: "Parakeet TDT 0.6B v3",
+    name: "Parakeet v3 · veloz e preciso",
     file: "parakeet-tdt-0.6b-v3.q8_0.gguf",
     url: "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3/resolve/541d1f99c6b0c3cd0b11a95167540bb8edefd82b/parakeet-tdt-0.6b-v3.q8_0.gguf",
     approxBytes: 713975456,
