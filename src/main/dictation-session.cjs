@@ -13,6 +13,17 @@ function normalizedRunId(value) {
     : null;
 }
 
+// The revision switch wins over the chosen mode: off means the text is pasted
+// as transcribed. The dashboard sends the switch with each dictation (it is
+// current before the settings autosave lands); otherwise the saved value holds.
+function resolveRevisionMode(payload, settings) {
+  const enabled = typeof payload?.revisionEnabled === "boolean"
+    ? payload.revisionEnabled
+    : settings.revisionEnabled !== false;
+  if (!enabled) return "literal";
+  return payload?.revisionMode || settings.revisionMode;
+}
+
 function abortError() {
   const error = new Error("Ditado cancelado.");
   error.name = "AbortError";
@@ -231,7 +242,7 @@ class DictationSession {
         profile,
         vocabulary,
         threads: os.cpus().length,
-        revisionMode: payload?.revisionMode || settings.revisionMode,
+        revisionMode: resolveRevisionMode(payload, settings),
         revisionModel: payload?.revisionModel || settings.revisionModel,
         revisionTimeoutMs: settings.revisionTimeoutMs,
         ...resolvePersonalizationOptions(payload, settings),
@@ -380,4 +391,4 @@ class DictationSession {
   }
 }
 
-module.exports = { DictationSession, normalizedRunId };
+module.exports = { DictationSession, normalizedRunId, resolveRevisionMode };

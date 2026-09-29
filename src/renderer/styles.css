@@ -1119,6 +1119,17 @@ textarea:focus {
   margin-bottom: 16px;
 }
 
+.settings-group-head.has-switch {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-group.is-off .field-grid {
+  opacity: 0.5;
+}
+
 .settings-group-head p {
   margin: 3px 0 0;
   color: var(--text-3);

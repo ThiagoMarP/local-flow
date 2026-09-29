@@ -97,6 +97,7 @@ function registerAppIpc({
       }
       windowManager.setProfile(getActiveProfile());
       windowManager.setRevisionMode(next.revisionMode);
+      windowManager.setRevisionEnabled(next.revisionEnabled);
       applyUiState({
         ...windowManager.currentUiState,
         profile: getActiveProfile(),
@@ -124,6 +125,7 @@ function registerAppIpc({
     setActiveProfile(defaults.profile);
     windowManager.setProfile(getActiveProfile());
     windowManager.setRevisionMode(defaults.revisionMode);
+    windowManager.setRevisionEnabled(defaults.revisionEnabled);
     if (previous.launchAtLogin && canManageLoginItem) {
       loginItemService.apply(false);
     }

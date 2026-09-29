@@ -397,5 +397,10 @@ test("menu da bandeja só é remontado quando o conteúdo muda", () => {
   assert.equal(built.at(-1)[0].label, "Transcrevendo…");
   manager.setRevisionMode("prompt");
   assert.equal(built.length, afterSetup + 3);
+  manager.setRevisionEnabled(false);
+  assert.equal(built.length, afterSetup + 4);
+  assert.equal(built.at(-1)[2].label, "Modo de revisão (desligada)");
+  manager.setRevisionEnabled(false);
+  assert.equal(built.length, afterSetup + 4);
   manager.beginQuit();
 });

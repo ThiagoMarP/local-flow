@@ -239,6 +239,20 @@ function trayTarget() {
   };
 }
 
+async function setRevisionEnabledFromTray(enabled) {
+  try {
+    const next = await settingsStore.update({ revisionEnabled: enabled });
+    windowManager.setRevisionEnabled(next.revisionEnabled);
+    const dashboard = windowManager.dashboardWindow;
+    if (dashboard && !dashboard.isDestroyed()) {
+      dashboard.webContents.send("settings:revision-enabled", next.revisionEnabled);
+    }
+    await logger.info("revision_enabled_changed", { source: "tray", enabled: next.revisionEnabled });
+  } catch (error) {
+    logger.error("revision_enabled_change_failed", error);
+  }
+}
+
 async function setRevisionModeFromTray(mode) {
   try {
     const next = await settingsStore.update({ revisionMode: mode });
@@ -531,6 +545,7 @@ app.whenReady().then(async () => {
   });
 
   windowManager.setProfile(activeProfile);
+  windowManager.setRevisionEnabled(settings.revisionEnabled);
   windowManager.setRevisionMode(
     settings.revisionMode,
     settingsStore.getPublic().allowedRevisionModes,
@@ -539,6 +554,7 @@ app.whenReady().then(async () => {
     toggleDictation: () => toggleDictation({ target: trayTarget() }),
     copyLast: () => lastTranscriptionPaster.paste({ target: trayTarget() }),
     setRevisionMode: setRevisionModeFromTray,
+    setRevisionEnabled: setRevisionEnabledFromTray,
   });
   windowManager.createAll({
     dashboardQuery:

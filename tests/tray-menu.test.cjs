@@ -8,6 +8,7 @@ function input(overrides = {}) {
     toggleDictation: () => calls.push("toggleDictation"),
     copyLast: () => calls.push("copyLast"),
     setRevisionMode: (mode) => calls.push(`revision:${mode}`),
+    setRevisionEnabled: (enabled) => calls.push(`enabled:${enabled}`),
     showDashboard: () => calls.push("showDashboard"),
     toggleDashboard: () => calls.push("toggleDashboard"),
     quit: () => calls.push("quit"),
@@ -22,6 +23,7 @@ function input(overrides = {}) {
       shortcut: { registered: true, display: "Ctrl+Shift+Espaço" },
       repaste: { registered: true, disabled: false, display: "Ctrl+Alt+V" },
       revisionMode: "literal",
+      revisionEnabled: true,
       revisionModes: [
         { value: "literal", label: "Literal" },
         { value: "prompt", label: "Prompt para IA" },
@@ -65,12 +67,31 @@ test("item do ditado reflete o estado atual", () => {
 test("submenu marca o modo de revisão atual e troca ao clicar", () => {
   const { value, calls } = input({ revisionMode: "prompt" });
   const submenu = buildTrayTemplate(value)[2].submenu;
+  const modes = submenu.filter((item) => item.type === "radio");
   assert.deepEqual(
-    submenu.map((item) => [item.label, item.type, item.checked]),
-    [["Literal", "radio", false], ["Prompt para IA", "radio", true]],
+    modes.map((item) => [item.label, item.checked, item.enabled]),
+    [["Literal", false, true], ["Prompt para IA", true, true]],
   );
-  submenu[0].click();
+  modes[0].click();
   assert.deepEqual(calls, ["revision:literal"]);
+});
+
+// Mesmo switch do painel: liga e desliga a revisão sem abrir o painel.
+test("submenu começa com o liga/desliga da revisão", () => {
+  const on = input();
+  const onMenu = buildTrayTemplate(on.value)[2].submenu;
+  assert.deepEqual([onMenu[0].label, onMenu[0].type, onMenu[0].checked], ["Ligada", "checkbox", true]);
+  assert.equal(onMenu[1].type, "separator");
+  onMenu[0].click();
+  assert.deepEqual(on.calls, ["enabled:false"]);
+
+  const off = input({ revisionEnabled: false });
+  const offMenu = buildTrayTemplate(off.value)[2].submenu;
+  assert.equal(offMenu[0].checked, false);
+  assert.ok(offMenu.filter((item) => item.type === "radio").every((item) => item.enabled === false));
+  assert.equal(buildTrayTemplate(off.value)[2].label, "Modo de revisão (desligada)");
+  offMenu[0].click();
+  assert.deepEqual(off.calls, ["enabled:true"]);
 });
 
 // O menu escrevia "Ctrl + Win" fixo no código.
