@@ -2,6 +2,12 @@
   "name": "local-flow",
   "version": "0.8.19",
   "private": true,
+  "license": "MIT",
+  "homepage": "https://github.com/ThiagoMarP/local-flow",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ThiagoMarP/local-flow.git"
+  },
   "description": "Aplicativo local de ditado e transcrição para Windows",
   "author": "Thiago Marçal",
   "type": "module",

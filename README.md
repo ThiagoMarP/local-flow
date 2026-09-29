@@ -31,6 +31,18 @@ transcrição; nas reuniões, a gravação fica no histórico local até você a
   IA. Literal e Limpeza rápida funcionam sem ele; a Limpeza leve também funciona
   sem ele nos casos rápidos reconhecidos.
 
+## Download
+
+Baixe o instalador `Local Flow Setup X.Y.Z.exe` na página de
+[Releases](https://github.com/ThiagoMarP/local-flow/releases/latest) e execute.
+
+> **Aviso do Windows:** o instalador ainda não tem assinatura digital. O
+> SmartScreen pode mostrar "O Windows protegeu o computador": clique em **Mais
+> informações** e depois em **Executar assim mesmo**. Se o seu PC tiver o Smart
+> App Control ligado e ele bloquear sem essa opção, ainda não é possível
+> instalar nesse computador. O código-fonte está aberto para você conferir e
+> compilar por conta própria.
+
 ## Instalação
 
 A forma recomendada é o instalador `.exe`. Consulte
@@ -91,3 +103,9 @@ O áudio do ditado é temporário e removido após a transcrição. Reuniões ma
 dado de áudio é enviado a servidores externos; a revisão por LLM, quando
 ativada, usa um Ollama local.
 Veja `DECISIONS.md` para o registro completo de decisões de privacidade.
+
+## Licença
+
+Código sob a [licença MIT](LICENSE). Os componentes de terceiros (whisper.cpp,
+NeMo-Speech.cpp, modelos Whisper e Parakeet) mantêm as suas próprias licenças,
+listadas em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
