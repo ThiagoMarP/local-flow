@@ -5,10 +5,14 @@
 //   - double tap  → two quick taps: toggle a locked recording on/off.
 //   - single tap  → ignored by default (avoids accidental triggers).
 //
+// Every press also reports onPressDown right away, before the gesture is
+// known, so the microphone can start opening during the hold threshold.
+//
 // All timing lives here, in plain JS, so it can be unit-tested with a fake
 // clock. The PowerShell hook only reports key transitions.
 class HotkeyController {
   constructor({
+    onPressDown = () => {},
     onHoldStart = () => {},
     onHoldStop = () => {},
     onLockToggle = () => {},
@@ -18,6 +22,7 @@ class HotkeyController {
     setTimer = setTimeout,
     clearTimer = clearTimeout,
   } = {}) {
+    this.onPressDown = onPressDown;
     this.onHoldStart = onHoldStart;
     this.onHoldStop = onHoldStop;
     this.onLockToggle = onLockToggle;
@@ -37,6 +42,7 @@ class HotkeyController {
   pressDown() {
     if (this.down) return;
     this.down = true;
+    this.onPressDown();
     // A new press cancels a pending single-tap decision: it may become the
     // second half of a double tap.
     this.clearTimer(this.singleTapTimer);

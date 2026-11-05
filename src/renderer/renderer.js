@@ -1,4 +1,6 @@
 import { joinAndEncode } from "./audio.js";
+import { createMicrophone } from "./microphone.js";
+import { playStartCue, playStopCue } from "./sound-cues.js";
 import { createSettingsController } from "./settings-controller.js";
 import { createSetupController } from "./setup-controller.js";
 import {
@@ -89,6 +91,7 @@ const autoPasteInput = document.querySelector("#autoPasteInput");
 const restoreClipboardInput = document.querySelector(
   "#restoreClipboardInput",
 );
+const soundCuesInput = document.querySelector("#soundCuesInput");
 const launchAtLoginInput = document.querySelector(
   "#launchAtLoginInput",
 );
@@ -119,6 +122,7 @@ const settingsController = createSettingsController({
   ruleTestOutput: document.querySelector("#ruleTestOutput"),
   autoPasteInput,
   restoreClipboardInput,
+  soundCuesInput,
   launchAtLoginInput,
   startMinimizedInput,
   shortcutKey,
@@ -188,11 +192,7 @@ function useModel(profile) {
   profileSelect.dispatchEvent(new Event("change"));
 }
 
-let audioContext;
-let sourceNode;
-let processorNode;
-let silentGain;
-let microphoneStream;
+const microphone = createMicrophone({ onFrame: handleCaptureFrame });
 let chunks = [];
 let recordingStartedAt = 0;
 let timerInterval;
@@ -432,7 +432,58 @@ function updateTimer() {
 }
 
 function buildWav() {
-  return joinAndEncode(chunks, audioContext.sampleRate, 16000);
+  return joinAndEncode(chunks, microphone.sampleRate, 16000);
+}
+
+function soundCuesEnabled() {
+  return settingsController.get()?.soundCues !== false;
+}
+
+function microphoneAttempts() {
+  const processing = {
+    channelCount: 1,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+  };
+  const microphoneId = settingsController.get()?.microphoneId;
+  const attempts = [];
+  if (microphoneId && microphoneId !== "default") {
+    attempts.push({ audio: { ...processing, deviceId: { exact: microphoneId } } });
+  }
+  attempts.push({ audio: processing });
+  // The final attempt requests the default input without optional processing,
+  // which is broadly compatible.
+  attempts.push({ audio: true });
+  return attempts;
+}
+
+function handleCaptureFrame({ samples, peak, rms = 0 }) {
+  if (state !== "recording") return;
+  chunks.push(samples);
+  if (peak > maxPeak) maxPeak = peak;
+  if (peak >= NO_SPEECH_PEAK && rms >= NO_SPEECH_RMS) {
+    speechFrameCount += 1;
+  }
+  // Square-root curve + gain: lifts a normal speaking volume into a lively
+  // range instead of only reacting to loud speech, while silence stays low.
+  const level = Math.min(1, Math.pow(peak, 0.5) * 2);
+  currentLevel = level;
+  meterFill.style.width = `${Math.min(100, 4 + level * 96)}%`;
+  const now = Date.now();
+  if (now - lastLevelPublish > 80) {
+    lastLevelPublish = now;
+    publishUiState({
+      elapsedMs: now - recordingStartedAt,
+      level,
+    });
+  }
+}
+
+// Ctrl+Win was pressed and may become a dictation: open the microphone now.
+function prepareRecording() {
+  if (!["idle", "success", "error"].includes(state) || isMeetingCapturing()) return;
+  microphone.prepare(microphoneAttempts());
 }
 
 async function startRecording(source = "manual") {
@@ -441,122 +492,28 @@ async function startRecording(source = "manual") {
   activeRunId = runId;
   transcriptionStarted = false;
   deliveryCommitted = false;
-  let openingStream;
-  let openingContext;
   try {
     recordingSource = source;
     maxDurationStopRequested = false;
     maxPeak = 0;
     speechFrameCount = 0;
     setStatus("requesting", "Solicitando acesso ao microfone…");
-    const audioOptions = {
-      channelCount: 1,
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    };
-    if (
-      settingsController.get()?.microphoneId &&
-      settingsController.get().microphoneId !== "default"
-    ) {
-      audioOptions.deviceId = {
-        exact: settingsController.get().microphoneId,
-      };
-    }
-    const attempts = [{ audio: audioOptions }];
-    if (audioOptions.deviceId) {
-      attempts.push({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-    }
-    // Some Windows USB drivers reject Chromium's processing constraints with
-    // "Could not start audio source". The final attempt requests the default
-    // input without optional processing, which is broadly compatible.
-    attempts.push({ audio: true });
-    let microphoneError;
-    for (const constraints of attempts) {
-      try {
-        const acquiredStream = await navigator.mediaDevices.getUserMedia(
-          constraints,
-        );
-        if (generation !== dictationGeneration) {
-          acquiredStream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        openingStream = acquiredStream;
-        microphoneError = null;
-        break;
-      } catch (error) {
-        if (generation !== dictationGeneration) return;
-        microphoneError = error;
-        if (error.name === "NotAllowedError") break;
-        await new Promise((resolve) => window.setTimeout(resolve, 180));
-      }
-    }
-    if (!openingStream) throw microphoneError;
+    const preroll = await microphone.start(
+      microphoneAttempts(),
+      () => generation === dictationGeneration,
+    );
+    if (!preroll) return;
 
-    openingContext = new AudioContext();
-    const nextSourceNode = openingContext.createMediaStreamSource(openingStream);
-    // AudioWorklet replaces the deprecated ScriptProcessorNode: capture runs on
-    // the audio thread and posts buffered PCM frames (with their peak) here, so
-    // a busy main thread can't cause dropouts. A fresh context each recording
-    // means addModule registers the processor exactly once per context.
-    await openingContext.audioWorklet.addModule("./capture-worklet.js");
-    if (generation !== dictationGeneration) return;
-    const nextProcessorNode = new AudioWorkletNode(openingContext, "capture-processor", {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      channelCount: 1,
-    });
-    const nextSilentGain = openingContext.createGain();
-    nextSilentGain.gain.value = 0;
-    microphoneStream = openingStream;
-    audioContext = openingContext;
-    sourceNode = nextSourceNode;
-    processorNode = nextProcessorNode;
-    silentGain = nextSilentGain;
-    openingStream = undefined;
-    openingContext = undefined;
     chunks = [];
-
-    processorNode.port.onmessage = (event) => {
-      if (state !== "recording" || generation !== dictationGeneration) return;
-      const { samples, peak, rms = 0 } = event.data;
-      chunks.push(samples);
-      if (peak > maxPeak) maxPeak = peak;
-      if (peak >= NO_SPEECH_PEAK && rms >= NO_SPEECH_RMS) {
-        speechFrameCount += 1;
-      }
-      // Square-root curve + gain: lifts a normal speaking volume into a lively
-      // range instead of only reacting to loud speech, while silence stays low.
-      const level = Math.min(1, Math.pow(peak, 0.5) * 2);
-      currentLevel = level;
-      meterFill.style.width = `${Math.min(100, 4 + level * 96)}%`;
-      const now = Date.now();
-      if (now - lastLevelPublish > 80) {
-        lastLevelPublish = now;
-        publishUiState({
-          elapsedMs: now - recordingStartedAt,
-          level,
-        });
-      }
-    };
-
-    sourceNode.connect(processorNode);
-    processorNode.connect(silentGain);
-    silentGain.connect(audioContext.destination);
-
     recordingStartedAt = Date.now();
     currentLevel = 0;
     showEscHint = takeEscHint();
     timerElement.textContent = "00:00";
     timerInterval = window.setInterval(updateTimer, 250);
     setStatus("recording", "Ouvindo…");
+    // What the microphone heard between the key press and now.
+    for (const frame of preroll) handleCaptureFrame(frame);
+    if (soundCuesEnabled()) playStartCue();
     reportDictationEvent({
       type: "started",
       source: recordingSource,
@@ -582,25 +539,14 @@ async function startRecording(source = "manual") {
     reportDictationEvent({
       type: "error",
       source: recordingSource,
-      message: error.message,
+      message: error?.message,
     });
-  } finally {
-    openingStream?.getTracks().forEach((track) => track.stop());
-    if (openingContext && openingContext.state !== "closed") {
-      await openingContext.close().catch(() => {});
-    }
   }
 }
 
 async function stopAudioGraph() {
   window.clearInterval(timerInterval);
-  processorNode?.disconnect();
-  sourceNode?.disconnect();
-  silentGain?.disconnect();
-  microphoneStream?.getTracks().forEach((track) => track.stop());
-  if (audioContext && audioContext.state !== "closed") {
-    await audioContext.close();
-  }
+  microphone.stop();
   meterFill.style.width = "0";
 }
 
@@ -611,6 +557,7 @@ async function cancelRecording(reason = "cancelled", acceptedByMain = false) {
   if (deliveryCommitted) return false;
   const generation = dictationGeneration;
   const wasProcessing = state === "processing" || state === "revising";
+  if (state === "recording" && soundCuesEnabled()) playStopCue();
   if (wasProcessing && transcriptionStarted && !acceptedByMain) {
     if (cancelRequestPending) return false;
     cancelRequestPending = true;
@@ -668,6 +615,7 @@ async function stopAndTranscribe(source = recordingSource) {
     }
     return;
   }
+  if (soundCuesEnabled()) playStopCue();
   // Fast no-speech check: if the recording never crossed the speech threshold,
   // skip the whole transcription (model load + inference) and answer instantly
   // instead of making the user wait through a "loading" cycle for silence.
@@ -1210,10 +1158,18 @@ profileSelect.addEventListener("change", () => {
 });
 
 window.addEventListener("beforeunload", () => {
-  microphoneStream?.getTracks().forEach((track) => track.stop());
+  microphone.stop();
 });
 
 window.localFlow.onDictationCommand(async (command) => {
+  if (command?.action === "prepare") {
+    prepareRecording();
+    return;
+  }
+  if (command?.action === "release") {
+    microphone.release();
+    return;
+  }
   if (command?.action === "start") {
     if (["idle", "success", "error"].includes(state)) {
       await startRecording("shortcut");
@@ -1448,6 +1404,7 @@ async function initialize() {
       );
     } else {
       setStatus("idle", "Pronto para gravar.");
+      microphone.warmUp();
     }
     if (
       new URLSearchParams(window.location.search).get("selfTest") ===
@@ -1472,7 +1429,7 @@ async function runMicrophoneSelfTest() {
     await window.localFlow.reportSelfTest({
       wavBytes: wav.byteLength,
       chunks: chunks.length,
-      inputSampleRate: audioContext.sampleRate,
+      inputSampleRate: microphone.sampleRate,
     });
   } catch (error) {
     await window.localFlow.reportSelfTest({

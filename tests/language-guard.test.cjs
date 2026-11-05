@@ -49,3 +49,30 @@ test("textos curtos não disparam o detector", () => {
   assert.equal(looksLikeLanguageDrift("Thank you.").drifted, false);
   assert.equal(looksLikeLanguageDrift("").drifted, false);
 });
+
+test("detecta inglês misturado no meio de um ditado em português", () => {
+  // Saída real do Parakeet: o português ainda vence a contagem, mas o texto
+  // saiu ilegível.
+  const result = looksLikeLanguageDrift(
+    "Eu sinto que na hora que eu começo o ditado, ele dá uma leve travadinha. " +
+      "You queria ajustar esse level travadinho. Acho que deveria ter um barulho, " +
+      "um som um pouco mais agudo, and when you fecha, que é um som mais fechado. " +
+      "But I acho que dá para deixar ele um pouco mais longo.",
+  );
+  assert.equal(result.drifted, true);
+  assert.ok(result.portugueseHits > result.englishHits);
+});
+
+test("um ou outro termo em inglês num ditado longo não dispara", () => {
+  const result = looksLikeLanguageDrift(
+    "Aí eu acho que é isso. No terceiro rascunho que você falou pra mim, fala que eu " +
+      "iniciei minha prospecção ativa e que o objetivo is fechar três clientes. " +
+      "Eu quero que você deixe o texto mais curto, com uma frase de abertura forte, " +
+      "e que mostre o resultado do mês. Depois a gente vê se vale mandar to eles " +
+      "também, porque já tem muita coisa no rascunho e eu não quero que fique " +
+      "pesado demais. Então faz uma versão nova, com o tom mais leve, e me manda on " +
+      "aqui para eu ver antes de postar, ou a gente ajusta junto amanhã de manhã.",
+  );
+  assert.equal(result.englishHits, 3);
+  assert.equal(result.drifted, false);
+});

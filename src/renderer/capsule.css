@@ -43,8 +43,8 @@ body {
   width: fit-content;
   min-width: 36px;
   max-width: 240px;
-  height: 34px;
-  padding: 3px 9px;
+  height: 26px;
+  padding: 2px 9px;
   border: 1px solid #ffffff1f;
   border-radius: 999px;
   background: rgba(10, 10, 12, 0.82);
@@ -54,6 +54,8 @@ body {
   color: #fff;
   user-select: none;
   transition:
+    opacity 140ms ease,
+    transform 190ms ease,
     height 190ms ease,
     min-width 190ms ease,
     padding 190ms ease,
@@ -62,14 +64,12 @@ body {
     box-shadow 190ms ease;
 }
 
-/* At rest: a small thin pill near the top — same dark fill + contour as the
-   active states, just shorter. It grows into the full pill while recording and
-   shrinks back when idle. */
+/* At rest the pill is gone: it only appears once a dictation starts and fades
+   out again when it ends. The window itself stays shown (see window-manager),
+   so the first frame of a recording never waits on Windows. */
 .capsule[data-state="idle"] {
-  min-width: 0;
-  width: 48px;
-  height: 9px;
-  padding: 0;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.92);
 }
 
 .logo,
@@ -96,16 +96,16 @@ body {
 .wave {
   --amp: 0;
   flex: 0 0 auto;
-  height: 14px;
+  height: 12px;
   display: flex;
-  gap: 2.5px;
+  gap: 4px;
   align-items: center;
   transition: --amp 150ms linear;
 }
 
 .wave i {
   width: 2.5px;
-  height: 14px;
+  height: 12px;
   border-radius: 99px;
   background: #fff;
   transform-origin: center;
@@ -247,8 +247,8 @@ body {
 .capsule[data-state="processing"],
 .capsule[data-state="revising"],
 .capsule[data-state="success"] {
-  padding-right: 14px;
-  padding-left: 14px;
+  padding-right: 22px;
+  padding-left: 22px;
 }
 
 /* Meeting capture reuses the exact recording pill, wave and size; it just also
@@ -374,7 +374,7 @@ body {
   display: block;
 }
 .capsule[data-state="success"][data-manual-paste="true"] .notice-text {
-  padding: 4px 6px 3px;
+  padding: 3px 6px 2px;
   border: 1px solid #ffffff47;
   border-bottom-width: 2px;
   border-radius: 6px;
@@ -400,8 +400,8 @@ body {
   display: flex;
 }
 .capsule[data-state="error"] .discard {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-color: transparent;
   background: transparent;
   box-shadow: none;

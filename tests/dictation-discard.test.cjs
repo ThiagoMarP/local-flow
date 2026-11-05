@@ -137,10 +137,12 @@ function createRenderer(options = {}) {
       }
       createMediaStreamSource() { return { connect() {}, disconnect() {} }; }
       createGain() { return { gain: {}, connect() {}, disconnect() {} }; }
+      async resume() { this.state = "running"; }
+      async suspend() { this.state = "suspended"; }
       async close() { await close.promise; this.state = "closed"; }
     },
     AudioWorkletNode: class {
-      constructor() { this.port = { onmessage: null }; worklet = this; }
+      constructor() { this.port = { onmessage: null, postMessage() {} }; worklet = this; }
       connect() {}
       disconnect() {}
     },
@@ -159,7 +161,15 @@ function createRenderer(options = {}) {
     timeSavedMinutes: (words) => words / 40 - words / 150,
     panelShortcut: () => null,
     recordingHint: (input) => realRecordingHint(input),
+    playStartCue() {},
+    playStopCue() {},
   });
+  // The microphone module runs inside the same context, so it sees the fake
+  // getUserMedia and Web Audio above.
+  const microphoneSource = fs.readFileSync(
+    path.join(__dirname, "../src/renderer/microphone.js"), "utf8",
+  ).replace(/^export /gm, "");
+  vm.runInContext(microphoneSource, context, { filename: "microphone.js" });
 
   const source = fs.readFileSync(
     path.join(__dirname, "../src/renderer/renderer.js"), "utf8",
@@ -264,7 +274,6 @@ test("Esc enquanto o microfone abre descarta a captura que chegar atrasada", asy
   await start;
 
   assert.equal(stoppedTracks, 1);
-  assert.equal(renderer.worklet, undefined);
   assert.equal(renderer.transcriptions, 0);
   assert.match(renderer.element("#status").textContent, /descartada/i);
 });

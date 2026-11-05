@@ -112,6 +112,8 @@ function createHotkeyTrigger({
   windowManager,
   getProfile = () => "standard",
   onEscape = () => {},
+  onPrepare = () => {},
+  onRelease = () => {},
   logger,
   holdThresholdMs,
   doubleTapWindowMs,
@@ -131,6 +133,10 @@ function createHotkeyTrigger({
   const controller = new HotkeyController({
     holdThresholdMs,
     doubleTapWindowMs,
+    // The press opens the microphone ahead of the gesture; a lone tap (or a
+    // Ctrl+Win+key chord, which ends as a tap) closes it again.
+    onPressDown: onPrepare,
+    onSingleTap: onRelease,
     onHoldStart: () => guard(shortcutController.start()),
     onHoldStop: () => guard(shortcutController.stop()),
     onLockToggle: () => guard(shortcutController.toggle()),

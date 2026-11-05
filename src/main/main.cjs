@@ -176,6 +176,19 @@ function sendDictationCommand(action) {
   window.webContents.send("dictation:command", { action, source: "shortcut" });
 }
 
+// Ctrl+Win was pressed: the renderer opens the microphone now so the hold or
+// double tap that may follow starts recording without the open delay. Only
+// while nothing else holds the microphone.
+function prepareDictation(action) {
+  if (shortcutController.state !== "idle" || dictation.isBusy()) return;
+  if (action === "prepare" && meetings.blocksDictation()) return;
+  try {
+    sendDictationCommand(action);
+  } catch {
+    // No renderer to warm up; the gesture itself reports the failure.
+  }
+}
+
 function createShortcutController() {
   shortcutController = new ToggleDictationController({
     captureTarget: captureDictationTarget,
@@ -616,6 +629,8 @@ app.whenReady().then(async () => {
       windowManager,
       getProfile: () => activeProfile,
       onEscape: () => dictation.cancel("escape"),
+      onPrepare: () => prepareDictation("prepare"),
+      onRelease: () => prepareDictation("release"),
       logger,
     });
     dictation.attachControls({ hotkeyTrigger });

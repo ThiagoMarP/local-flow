@@ -23,6 +23,7 @@ export function createSettingsController({
   ruleTestOutput,
   autoPasteInput,
   restoreClipboardInput,
+  soundCuesInput,
   launchAtLoginInput,
   startMinimizedInput,
   shortcutKey,
@@ -47,6 +48,7 @@ export function createSettingsController({
     writingProfileSelect,
     autoPasteInput,
     restoreClipboardInput,
+    soundCuesInput,
     launchAtLoginInput,
     startMinimizedInput,
   ];
@@ -156,6 +158,7 @@ export function createSettingsController({
       // Ctrl+V being sent does not prove that the target field received text.
       // Keep the transcription available for manual paste in that case.
       restoreClipboard: false,
+      soundCues: soundCuesInput.checked,
       launchAtLogin: launchAtLoginInput.checked,
       startMinimized: startMinimizedInput.checked,
     };
@@ -226,6 +229,7 @@ export function createSettingsController({
     snippetTable.set(settings.snippets);
     autoPasteInput.checked = settings.autoPaste;
     restoreClipboardInput.checked = false;
+    soundCuesInput.checked = settings.soundCues !== false;
     launchAtLoginInput.checked = settings.launchAtLogin;
     startMinimizedInput.checked = settings.startMinimized;
     syncRevisionControls();

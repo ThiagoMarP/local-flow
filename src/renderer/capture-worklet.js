@@ -9,6 +9,11 @@ class CaptureProcessor extends AudioWorkletProcessor {
     super();
     this.buffer = new Float32Array(FRAME);
     this.filled = 0;
+    // The renderer keeps this processor across dictations and asks for a reset
+    // before each one, so a partial frame from the last never leaks into it.
+    this.port.onmessage = () => {
+      this.filled = 0;
+    };
   }
 
   process(inputs) {

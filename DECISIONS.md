@@ -132,3 +132,16 @@ moram em uma pasta gravável de dados do usuário, preservada entre
 atualizações. O serviço `app-paths.cjs` é a única fonte de verdade dos
 caminhos em desenvolvimento e em produção, evitando que `__dirname`
 dentro do asar quebre a localização de binários e modelos.
+
+## 2026-11-05 — Microfone aberto na pressão de Ctrl+Win
+
+Abrir o microfone leva de 150 a 450 ms no Windows, e o gesto de segurar
+espera 220 ms antes de começar. Somados, as primeiras palavras se
+perdiam. Agora a pressão de Ctrl+Win já abre o microfone, antes de o
+gesto ser conhecido, e os últimos 500 ms ouvidos entram no ditado.
+Se a pressão termina num toque simples (ou num atalho como Ctrl+Win+D),
+o microfone fecha em seguida, e em no máximo 2,5 s se nada acontecer.
+Esse áudio fica só na memória. O indicador de microfone do Windows pode
+piscar nesses casos; é o preço de não cortar o começo da fala. O
+`AudioContext` e o worklet de captura passam a durar a sessão inteira,
+suspensos entre ditados.
