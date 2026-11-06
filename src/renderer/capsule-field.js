@@ -8,9 +8,9 @@ const HISTORY_STEP_MS = 50;
 const SUCCESS_MS = 440;
 
 const PALETTES = {
-  blue: ["#050a1f", "#0d1d52", "#1f4499", "#3f80dc", "#8ccaff", "#e8f5ff"],
+  white: ["#0a0a0c", "#1b1b20", "#3a3a41", "#74747c", "#bdbdc3", "#f7f7f8"],
   // The last seconds before the duration limit.
-  amber: ["#050a1f", "#3a2306", "#7a4a0c", "#c27a16", "#f6b94a", "#fff1d6"],
+  amber: ["#0a0a0c", "#3a2306", "#7a4a0c", "#c27a16", "#f6b94a", "#fff1d6"],
 };
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
@@ -79,7 +79,7 @@ export function createCapsuleField(canvas) {
   let image = null;
 
   let mode = "idle";
-  let palette = "blue";
+  let palette = "white";
   let target = 0;
   let level = 0;
   let frame = null;
@@ -167,7 +167,7 @@ export function createCapsuleField(canvas) {
       const nextMode = state === "meeting" ? "recording" : state;
       if (nextMode === "success" && mode !== "success") successAt = performance.now();
       mode = nextMode;
-      palette = hint === "countdown" ? "amber" : "blue";
+      palette = hint === "countdown" ? "amber" : "white";
       target = Math.max(0, Math.min(1, Number(nextLevel) || 0));
       if (["recording", "processing", "revising", "success"].includes(mode)) start();
       else stop();

@@ -24,7 +24,7 @@ body {
   padding-top: 2px;
 }
 
-/* Minimal pill on deep navy: one indicator per state. The mic badge, status
+/* Minimal dark pill: one indicator per state. The mic badge, status
    text, timer and recording dot are intentionally absent; each state speaks
    for itself. */
 .capsule {
@@ -39,7 +39,7 @@ body {
   padding: 2px 9px;
   border: 1px solid #ffffff1f;
   border-radius: 999px;
-  background: rgba(5, 10, 31, 0.92);
+  background: rgba(10, 10, 12, 0.92);
   box-shadow:
     0 6px 15px #00000085,
     inset 0 1px #ffffff10;
@@ -294,7 +294,7 @@ body {
 .capsule[data-state="error"]:hover,
 .capsule[data-state="success"][data-manual-paste="true"]:hover {
   border-color: #ffffff38;
-  background: rgba(13, 22, 56, 0.94);
+  background: rgba(22, 22, 26, 0.94);
 }
 
 /* Locked recording (double tap, alternative shortcut, tray, panel button):
@@ -342,8 +342,8 @@ body {
 .hint,
 .timer,
 .lock {
-  text-shadow: 0 0 4px #050a1f, 0 0 2px #050a1f;
-  filter: drop-shadow(0 0 2px #050a1f);
+  text-shadow: 0 0 4px #0a0a0c, 0 0 2px #0a0a0c;
+  filter: drop-shadow(0 0 2px #0a0a0c);
 }
 
 @keyframes notice-in {
