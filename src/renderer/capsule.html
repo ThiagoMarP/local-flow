@@ -12,6 +12,7 @@
   </head>
   <body>
     <main class="capsule" id="capsule" data-state="idle">
+      <canvas class="field" id="field" aria-hidden="true"></canvas>
       <span class="logo" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
           <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
@@ -40,9 +41,7 @@
           <path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
         </svg>
         <span class="spinner" aria-hidden="true"></span>
-        <div class="wave" aria-hidden="true">
-          <canvas id="field"></canvas>
-        </div>
+        <div class="wave" aria-hidden="true"></div>
         <span class="hint" id="hint" aria-live="polite"></span>
         <span class="message" id="message">Pronto</span>
         <span class="timer" id="timer">00:00</span>

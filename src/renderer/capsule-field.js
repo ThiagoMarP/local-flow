@@ -1,12 +1,9 @@
-// The capsule's voice animation: a dithered pixel mist underneath, with the
-// voice drawn on top as tiny ASCII glyphs (. : - = + * #) that scroll from
-// right to left. Everything is drawn into one small canvas at 1 px per cell,
-// so it stays crisp when the window scales it up.
-const WIDTH = 120;
-const HEIGHT = 20;
+// The capsule's voice animation: a dithered pixel mist that fills the whole
+// pill and lights up with the voice. The canvas matches the pill's size at
+// 1 px per CSS px and the mist is drawn in 2x2 cells, so the grain stays crisp
+// however wide the pill grows (lock icon, hints).
 const MIST_CELL = 2;
-const GLYPH_W = 4;
-const GLYPH_H = 6;
+const HISTORY_LENGTH = 40;
 const HISTORY_STEP_MS = 50;
 const SUCCESS_MS = 440;
 
@@ -18,19 +15,6 @@ const PALETTES = {
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
   .map((value) => (value + 0.5) / 16);
-
-// 3x5 glyphs from faintest to brightest.
-const GLYPHS = [
-  null,
-  ["...", "...", "...", "...", ".#."],
-  ["...", ".#.", "...", ".#.", "..."],
-  ["...", "...", "###", "...", "..."],
-  ["...", "###", "...", "###", "..."],
-  ["...", ".#.", "###", ".#.", "..."],
-  ["#.#", ".#.", "###", ".#.", "#.#"],
-  [".#.", "###", ".#.", "###", ".#."],
-].map((rows) => rows && rows.flatMap((row, y) =>
-  [...row].flatMap((cell, x) => (cell === "#" ? [[x, y]] : []))));
 
 function toRgb(hex) {
   return [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16));
@@ -77,9 +61,8 @@ function crest(u, center, width = 0.012) {
   return Math.exp(-((u - center) ** 2) / width);
 }
 
-// How bright each column is, per state. `voice` is the scrolled level at that
-// column; t is in seconds.
-function columnEnergy(mode, u, voice, t, successProgress) {
+// How bright each column is outside recording; t is in seconds.
+function columnEnergy(mode, u, t, successProgress) {
   if (mode === "processing") return crest(u, ((t * 0.9) % 1.3) - 0.15);
   if (mode === "revising") {
     // Two crests closing in on the centre: the local AI consolidating.
@@ -87,18 +70,13 @@ function columnEnergy(mode, u, voice, t, successProgress) {
     return Math.max(crest(u, p * 0.5), crest(u, 1 - p * 0.5));
   }
   if (mode === "success") return Math.sin(Math.PI * successProgress) * 0.95;
-  return voice;
+  return 0;
 }
 
 export function createCapsuleField(canvas) {
-  canvas.width = WIDTH;
-  canvas.height = HEIGHT;
   const context = canvas.getContext("2d");
-  const image = context.createImageData(WIDTH, HEIGHT);
-  const columns = Math.floor(WIDTH / GLYPH_W);
-  const rows = Math.floor(HEIGHT / GLYPH_H);
-  const glyphTop = Math.floor((HEIGHT - rows * GLYPH_H) / 2) + 1;
-  const history = new Array(columns).fill(0);
+  const history = new Array(HISTORY_LENGTH).fill(0);
+  let image = null;
 
   let mode = "idle";
   let palette = "blue";
@@ -108,7 +86,19 @@ export function createCapsuleField(canvas) {
   let lastStep = 0;
   let successAt = 0;
 
+  // Follows the pill as it grows or shrinks.
+  function fit() {
+    const width = Math.max(MIST_CELL, Math.round(canvas.clientWidth));
+    const height = Math.max(MIST_CELL, Math.round(canvas.clientHeight));
+    if (image && canvas.width === width && canvas.height === height) return;
+    canvas.width = width;
+    canvas.height = height;
+    image = context.createImageData(width, height);
+  }
+
   function draw(now) {
+    frame = window.requestAnimationFrame(draw);
+    fit();
     const t = now / 1000;
     level += (target - level) * 0.25;
     if (now - lastStep >= HISTORY_STEP_MS) {
@@ -119,24 +109,35 @@ export function createCapsuleField(canvas) {
     const successProgress = Math.min(1, (now - successAt) / SUCCESS_MS);
     const colors = RGB[palette];
     const steps = colors.length;
-
-    // Mist layer, one value per 2x2 cell.
+    const width = canvas.width;
+    const cellsX = Math.ceil(width / MIST_CELL);
+    const cellsY = Math.ceil(canvas.height / MIST_CELL);
     const data = image.data;
-    for (let cy = 0; cy < HEIGHT / MIST_CELL; cy++) {
-      const dy = Math.abs(cy - (HEIGHT / MIST_CELL - 1) / 2) / (HEIGHT / MIST_CELL / 2);
-      for (let cx = 0; cx < WIDTH / MIST_CELL; cx++) {
-        const u = cx / (WIDTH / MIST_CELL);
+
+    for (let cy = 0; cy < cellsY; cy++) {
+      const dy = Math.abs(cy - (cellsY - 1) / 2) / (cellsY / 2);
+      for (let cx = 0; cx < cellsX; cx++) {
+        const u = cx / cellsX;
         const dx = Math.abs(u - 0.5) * 2;
         const n = fbm(cx * 0.11 - t * 0.9, cy * 0.28 + t * 0.15);
-        const voice = history[Math.floor(u * columns)];
-        const energy = mode === "recording"
-          ? 0.22 + level * 0.55 + voice * 0.45
-          : 0.2 + columnEnergy(mode, u, voice, t, successProgress) * 0.75;
-        const value = n * energy * (1.15 - dy * 0.75) * (1.1 - dx * 0.45);
-        const color = colors[Math.min(steps - 2, dither(value, cx, cy, steps))];
+        let value;
+        if (mode === "recording") {
+          // The voice scrolls from right to left across the pill.
+          const voice = history[Math.floor(u * HISTORY_LENGTH)];
+          const energy = 0.25 + level * 0.6 + voice * 0.65;
+          value = n * energy * (1.2 - dy * 0.7) * (1.1 - dx * 0.4);
+        } else {
+          const band = columnEnergy(mode, u, t, successProgress);
+          value = n * 0.32 + band * (1 - dy * 0.6) * 0.8;
+        }
+        const color = colors[dither(value, cx, cy, steps)];
         for (let py = 0; py < MIST_CELL; py++) {
+          const y = cy * MIST_CELL + py;
+          if (y >= canvas.height) break;
           for (let px = 0; px < MIST_CELL; px++) {
-            const offset = ((cy * MIST_CELL + py) * WIDTH + cx * MIST_CELL + px) * 4;
+            const x = cx * MIST_CELL + px;
+            if (x >= width) break;
+            const offset = (y * width + x) * 4;
             data[offset] = color[0];
             data[offset + 1] = color[1];
             data[offset + 2] = color[2];
@@ -145,30 +146,7 @@ export function createCapsuleField(canvas) {
         }
       }
     }
-
-    // ASCII layer on top: the wave itself, brightest in the middle row.
-    for (let column = 0; column < columns; column++) {
-      const u = column / columns;
-      const voice = history[column] * (0.75 + 0.25 * noise(column * 0.5, t * 3));
-      const amplitude = columnEnergy(mode, u, voice, t, successProgress);
-      for (let row = 0; row < rows; row++) {
-        const dy = Math.abs(row - (rows - 1) / 2) / (rows / 2);
-        const value = amplitude * 1.2 - dy * 0.55 +
-          (noise(column * 0.7, row + t * 2) - 0.5) * 0.15;
-        const glyph = GLYPHS[Math.max(0, Math.min(GLYPHS.length - 1,
-          Math.floor(value * GLYPHS.length)))];
-        if (!glyph) continue;
-        const color = colors[Math.min(steps - 1, 2 + Math.floor(value * (steps - 2)))];
-        for (const [gx, gy] of glyph) {
-          const offset = ((glyphTop + row * GLYPH_H + gy) * WIDTH + column * GLYPH_W + gx) * 4;
-          data[offset] = color[0];
-          data[offset + 1] = color[1];
-          data[offset + 2] = color[2];
-        }
-      }
-    }
     context.putImageData(image, 0, 0);
-    frame = window.requestAnimationFrame(draw);
   }
 
   function start() {

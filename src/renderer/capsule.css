@@ -81,21 +81,30 @@ body {
   overflow: hidden;
 }
 
-/* The voice animation lives in a canvas (capsule-field.js): a dithered pixel
-   mist with the voice drawn on top as ASCII glyphs. Drawn at 1 px per cell and
-   scaled without smoothing so the grain stays sharp. */
-.wave {
-  flex: 0 0 auto;
-  height: 20px;
-  display: flex;
-  align-items: center;
+/* The voice animation is a dithered pixel mist (capsule-field.js) painted
+   behind the whole pill, edge to edge, and clipped to its rounded shape. The
+   content (lock, hints) sits on top. .wave only reserves the pill's length. */
+.capsule {
+  position: relative;
+  isolation: isolate;
 }
 
-.wave canvas {
-  display: block;
+.field {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: none;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  image-rendering: pixelated;
+  transition: opacity 170ms ease;
+}
+
+.wave {
+  flex: 0 0 auto;
   width: 120px;
   height: 20px;
-  image-rendering: pixelated;
 }
 
 .spinner {
@@ -140,6 +149,13 @@ body {
 
 /* Recording, transcribing and the success pulse all share the same canvas
    and pill size. Only the motion differs (see capsule-field.js). */
+.capsule[data-state="recording"] .field,
+.capsule[data-state="meeting"] .field,
+.capsule[data-state="processing"] .field,
+.capsule[data-state="revising"] .field,
+.capsule[data-state="success"]:not([data-manual-paste="true"]) .field {
+  display: block;
+}
 .capsule[data-state="recording"] .wave,
 .capsule[data-state="meeting"] .wave,
 .capsule[data-state="processing"] .wave,
@@ -319,8 +335,15 @@ body {
   min-width: 26px;
   font-variant-numeric: tabular-nums;
 }
-.capsule[data-hint="silent"] .wave {
+.capsule[data-hint="silent"] .field {
   opacity: 0.35;
+}
+/* Text over the mist keeps a dark halo so it reads on bright pixels. */
+.hint,
+.timer,
+.lock {
+  text-shadow: 0 0 4px #050a1f, 0 0 2px #050a1f;
+  filter: drop-shadow(0 0 2px #050a1f);
 }
 
 @keyframes notice-in {
