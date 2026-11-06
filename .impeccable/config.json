@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "src/renderer/capsule.html"
+        ],
+        "createdAt": "2026-11-06T11:42:47.106Z",
+        "reason": "assistant triage: the pulsing dot is the meeting REC indicator, tied to a live recording, so the pulse is literal"
+      }
+    ]
+  }
+}

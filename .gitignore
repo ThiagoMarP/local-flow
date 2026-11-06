@@ -11,3 +11,6 @@ dist/
 *.log
 *.tmp
 
+
+# Impeccable session cache
+.impeccable/hook.cache.json
