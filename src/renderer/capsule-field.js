@@ -8,7 +8,7 @@ const HISTORY_STEP_MS = 50;
 const SUCCESS_MS = 440;
 
 const PALETTES = {
-  white: ["#0a0a0c", "#1b1b20", "#3a3a41", "#74747c", "#bdbdc3", "#f7f7f8"],
+  white: ["#0a0a0c", "#2c2c32", "#5c5c64", "#9d9da5", "#dcdce0", "#ffffff"],
   // The last seconds before the duration limit.
   amber: ["#0a0a0c", "#3a2306", "#7a4a0c", "#c27a16", "#f6b94a", "#fff1d6"],
 };
@@ -56,21 +56,14 @@ function dither(value, x, y, steps) {
   return Math.min(steps - 1, base + up);
 }
 
-// Brightness of a travelling crest at horizontal position u (0..1).
-function crest(u, center, width = 0.012) {
-  return Math.exp(-((u - center) ** 2) / width);
-}
-
-// How bright each column is outside recording; t is in seconds.
-function columnEnergy(mode, u, t, successProgress) {
-  if (mode === "processing") return crest(u, ((t * 0.9) % 1.3) - 0.15);
-  if (mode === "revising") {
-    // Two crests closing in on the centre: the local AI consolidating.
-    const p = (t * 0.8) % 1;
-    return Math.max(crest(u, p * 0.5), crest(u, 1 - p * 0.5));
-  }
-  if (mode === "success") return Math.sin(Math.PI * successProgress) * 0.95;
-  return 0;
+// Mist brightness outside recording; t is in seconds. Transcribing and
+// revising have no spot or band: the whole mist breathes, so the pill reads
+// as busy without a focal point.
+function idleEnergy(mode, t, successProgress) {
+  if (mode === "processing") return 0.62 + 0.14 * Math.sin(t * 4.2);
+  if (mode === "revising") return 0.6 + 0.16 * Math.sin(t * 2.6);
+  if (mode === "success") return 0.5 + Math.sin(Math.PI * successProgress) * 0.6;
+  return 0.4;
 }
 
 export function createCapsuleField(canvas) {
@@ -119,17 +112,14 @@ export function createCapsuleField(canvas) {
       for (let cx = 0; cx < cellsX; cx++) {
         const u = cx / cellsX;
         const dx = Math.abs(u - 0.5) * 2;
-        const n = fbm(cx * 0.11 - t * 0.9, cy * 0.28 + t * 0.15);
-        let value;
-        if (mode === "recording") {
-          // The voice scrolls from right to left across the pill.
-          const voice = history[Math.floor(u * HISTORY_LENGTH)];
-          const energy = 0.25 + level * 0.6 + voice * 0.65;
-          value = n * energy * (1.2 - dy * 0.7) * (1.1 - dx * 0.4);
-        } else {
-          const band = columnEnergy(mode, u, t, successProgress);
-          value = n * 0.32 + band * (1 - dy * 0.6) * 0.8;
-        }
+        // Revising drifts the other way, so the two waits look different.
+        const drift = mode === "revising" ? -1.3 : mode === "processing" ? 1.6 : 0.9;
+        const n = fbm(cx * 0.11 - t * drift, cy * 0.28 + t * 0.15);
+        // While recording, the voice scrolls from right to left across the pill.
+        const energy = mode === "recording"
+          ? 0.42 + level * 0.6 + history[Math.floor(u * HISTORY_LENGTH)] * 0.65
+          : idleEnergy(mode, t, successProgress);
+        const value = n * energy * (1.2 - dy * 0.7) * (1.1 - dx * 0.4);
         const color = colors[dither(value, cx, cy, steps)];
         for (let py = 0; py < MIST_CELL; py++) {
           const y = cy * MIST_CELL + py;
