@@ -73,6 +73,8 @@ const DEFAULT_SETTINGS = Object.freeze({
   // so a plain Ctrl+V wouldn't paste it. Keep the transcription as the current
   // clipboard entry instead.
   restoreClipboard: false,
+  // Short tones when the microphone opens and closes, like Discord's.
+  soundCues: true,
   maxRecordingSeconds: 120,
   // Switch in Settings → Revisão local. Off pastes the text as transcribed,
   // without the AI step; revisionMode is kept for when it is turned back on.
@@ -186,6 +188,10 @@ function normalizeSettings(value = {}) {
       : DEFAULT_SETTINGS.writingProfile,
     replacements: normalizeReplacements(value.replacements),
     snippets: normalizeSnippets(value.snippets),
+    soundCues:
+      typeof value.soundCues === "boolean"
+        ? value.soundCues
+        : DEFAULT_SETTINGS.soundCues,
     launchAtLogin:
       typeof value.launchAtLogin === "boolean"
         ? value.launchAtLogin

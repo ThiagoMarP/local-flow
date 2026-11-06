@@ -119,3 +119,23 @@ test("dois toques duplos alternam ligado e desligado", () => {
   }
   assert.deepEqual(events, ["lock-toggle", "lock-toggle"]);
 });
+
+test("cada pressão avisa na hora, antes de o gesto ser conhecido", () => {
+  const scheduler = createScheduler();
+  const events = [];
+  const controller = new HotkeyController({
+    onPressDown: () => events.push("press"),
+    onHoldStart: () => events.push("hold-start"),
+    onSingleTap: () => events.push("single-tap"),
+    setTimer: scheduler.setTimer,
+    clearTimer: scheduler.clearTimer,
+  });
+  controller.pressDown();
+  assert.deepEqual(events, ["press"]);
+  scheduler.advance(300);
+  controller.pressUp();
+  controller.pressDown();
+  controller.pressUp();
+  scheduler.advance(400);
+  assert.deepEqual(events, ["press", "hold-start", "press", "single-tap"]);
+});

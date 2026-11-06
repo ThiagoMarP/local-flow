@@ -1,9 +1,10 @@
 import { capsuleErrorLabel } from "./capsule-labels.js";
+import { createCapsuleField } from "./capsule-field.js";
 
 const capsule = document.querySelector("#capsule");
 const message = document.querySelector("#message");
 const timer = document.querySelector("#timer");
-const wave = document.querySelector("#wave");
+const field = createCapsuleField(document.querySelector("#field"));
 const noticeText = document.querySelector("#noticeText");
 const hint = document.querySelector("#hint");
 const discardButton = document.querySelector("#discardButton");
@@ -48,10 +49,11 @@ function render(state) {
   noticeText.textContent = state.state === "error"
     ? capsuleErrorLabel(state.message)
     : state.manualPaste ? "Ctrl+V" : "";
-  // Bars animate on their own in CSS; the live level only scales how far they
-  // swing, eased through the registered --amp custom property.
-  const level = Math.max(0, Math.min(1, Number(state.level) || 0));
-  wave.style.setProperty("--amp", level.toFixed(3));
+  field.update({
+    state: showsNotice(state) ? "idle" : state.state,
+    level: state.level,
+    hint: capsule.dataset.hint,
+  });
   // Main resets its hover flag on every new state. A notice replacing another
   // notice under a resting cursor fires no mouseenter, so report it again.
   if (!showsNotice(state)) pointerInside = false;

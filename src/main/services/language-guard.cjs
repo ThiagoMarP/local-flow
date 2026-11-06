@@ -23,6 +23,11 @@ const PORTUGUESE_FUNCTION_WORDS = new Set([
 ]);
 
 const MIN_ENGLISH_HITS = 3;
+// Parakeet also code-switches inside a Portuguese dictation ("You queria
+// ajustar", "and when you fecha"). Portuguese still wins the count there, so a
+// share of English function words this high is drift as well. Real Portuguese
+// dictations in the history stay under 5%; the mixed ones start near 8%.
+const MIXED_ENGLISH_SHARE = 0.08;
 
 // Parakeet also knows Russian, Ukrainian, Bulgarian and Greek. On short
 // dictations it can pick one of them ("e pode seguir" came out as "Ипоти").
@@ -46,13 +51,14 @@ function countFunctionWords(text) {
 function looksLikeLanguageDrift(text) {
   const counts = countFunctionWords(text);
   const foreignScript = FOREIGN_SCRIPT.test(String(text || ""));
+  const { englishHits, portugueseHits } = counts;
+  const englishShare = englishHits / Math.max(1, englishHits + portugueseHits);
   return {
     ...counts,
     foreignScript,
     drifted:
       foreignScript ||
-      (counts.englishHits >= MIN_ENGLISH_HITS &&
-        counts.englishHits > counts.portugueseHits),
+      (englishHits >= MIN_ENGLISH_HITS && englishShare >= MIXED_ENGLISH_SHARE),
   };
 }
 
